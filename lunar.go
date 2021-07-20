@@ -3,6 +3,7 @@ package lunar
 import (
 	"bufio"
 	"embed"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -17,39 +18,32 @@ cd ./files && curl -O https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T\[
 //go:embed files/*
 var files embed.FS
 
+var ErrNotFound = errors.New("lunar: date not found")
+
 type Date struct {
-	Date      time.Time
-	LunarDate time.Time
-	Weekday   time.Weekday
-	SolarTerm string
+	Date                            time.Time
+	lunarYear, lunarMonth, lunarDay int
+	LunarDate                       time.Time
+	Weekday                         time.Weekday
+	SolarTerm                       string
 }
 
-var lunarMap = map[string]int{
-	"初": 0,
-	"正": 1,
-	"二": 2,
-	"廿": 2,
-	"三": 3,
-	"四": 4,
-	"五": 5,
-	"六": 6,
-	"七": 7,
-	"八": 8,
-	"九": 9,
-	"十": 10,
+var lunarMap = map[rune]int{
+	'天': 0,
+	'初': 0,
+	'正': 1,
+	'一': 1,
+	'二': 2,
+	'廿': 2,
+	'三': 3,
+	'四': 4,
+	'五': 5,
+	'六': 6,
+	'七': 7,
+	'八': 8,
+	'九': 9,
+	'十': 10,
 }
-
-var weekdayMap = map[string]time.Weekday{
-	"星期一": time.Monday,
-	"星期二": time.Tuesday,
-	"星期三": time.Wednesday,
-	"星期四": time.Thursday,
-	"星期五": time.Friday,
-	"星期六": time.Saturday,
-	"星期天": time.Sunday,
-}
-
-var numberMap = map[string]int{}
 
 func Calendar(t time.Time) (*Date, error) {
 	t = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
@@ -63,7 +57,11 @@ func Calendar(t time.Time) (*Date, error) {
 }
 
 func find(rd io.Reader, t time.Time) (*Date, error) {
-	target := t.Format("2006年1月2日")
+	format := "2006年1月2日"
+	if t.Year() <= 2010 {
+		format = "2006年01月02日"
+	}
+	target := t.Format(format)
 	r := bufio.NewReader(rd)
 
 	// skip first three lines
@@ -74,6 +72,9 @@ func find(rd io.Reader, t time.Time) (*Date, error) {
 		}
 	}
 
+	lunarYear := t.Year() - 1
+	lunarMonth := 0
+	var beforeResult *Date
 	for {
 		line, err := r.ReadString('\n')
 		if len(line) == 0 && err != nil {
@@ -83,20 +84,77 @@ func find(rd io.Reader, t time.Time) (*Date, error) {
 			return nil, err
 		}
 
-		res := strings.Fields(line)
-		if res[0] != target {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
 			continue
 		}
 
+		rs := []rune(fields[1])
+		if rs[0] == rune('閏') {
+			rs = rs[1:]
+		}
+
+		isMonth := false
+		if rs[len(rs)-1] == rune('月') {
+			isMonth = true
+			rs = rs[:len(rs)-1]
+		}
+
+		lastChar := rs[len(rs)-1]
+		unitDigit := lunarMap[lastChar]
+		if lastChar == '正' {
+			lunarYear++
+		}
+
+		tensDigit := 0
+		if len(rs) > 1 {
+			tensDigit = lunarMap[rs[0]]
+			if tensDigit == 10 {
+				tensDigit = 1
+			}
+			if tensDigit != 0 && unitDigit == 10 {
+				tensDigit--
+			}
+		}
+
+		lunarDay := tensDigit*10 + unitDigit
+		if isMonth {
+			lunarMonth = lunarDay
+			lunarDay = 1
+		}
+
+		if beforeResult != nil && isMonth {
+			lunarMonth--
+			if lunarMonth == 0 {
+				lunarMonth = 12
+			}
+			beforeResult.LunarDate = time.Date(beforeResult.lunarYear, time.Month(lunarMonth), beforeResult.lunarDay, 0, 0, 0, 0, t.Location())
+			return beforeResult, nil
+		}
+
+		if fields[0] != target {
+			continue
+		}
+
+		weekday := []rune(fields[2])
 		d := &Date{
-			Date:    t,
-			Weekday: weekdayMap[res[2]],
+			Date:       t,
+			lunarYear:  lunarYear,
+			lunarMonth: lunarMonth,
+			lunarDay:   lunarDay,
+			Weekday:    time.Weekday(lunarMap[weekday[len(weekday)-1]]),
 		}
-		if len(res) > 3 {
-			d.SolarTerm = res[3]
+		if len(fields) > 3 {
+			d.SolarTerm = fields[3]
 		}
+
+		if lunarMonth == 0 {
+			beforeResult = d
+			continue
+		}
+		d.LunarDate = time.Date(d.lunarYear, time.Month(d.lunarMonth), d.lunarDay, 0, 0, 0, 0, t.Location())
 		return d, nil
 	}
 
-	return nil, nil
+	return nil, ErrNotFound
 }
