@@ -2,7 +2,6 @@ package lunar
 
 import (
 	"bufio"
-	"embed"
 	"errors"
 	"fmt"
 	"io"
@@ -15,10 +14,10 @@ cd ./files && curl -O https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T\[
 	find . -type f -exec sh -c 'iconv -f big5 -t utf-8 -c {} > {}.utf8' \; -exec mv "{}".utf8 "{}" \; && cd ..
 */
 
-//go:embed files/*
-var files embed.FS
-
-var ErrNotFound = errors.New("lunar: date not found")
+var (
+	ErrNotFound  = errors.New("lunar: date not found")
+	loadFileFunc func(string) (io.ReadCloser, error)
+)
 
 type Date struct {
 	Date                            time.Time
@@ -47,7 +46,8 @@ var lunarMap = map[rune]int{
 
 func Calendar(t time.Time) (*Date, error) {
 	t = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-	f, err := files.Open(fmt.Sprintf("files/T%dc.txt", t.Year()))
+	fileName := fmt.Sprintf("T%dc.txt", t.Year())
+	f, err := loadFileFunc(fileName)
 	if err != nil {
 		return nil, err
 	}
