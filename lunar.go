@@ -53,6 +53,19 @@ func (d Date) String() string {
 	return d.Time().Format("20060102")
 }
 
+func (d Date) Valid() bool {
+	return d.Year != 0 && d.Month != 0 && d.Day != 0
+}
+
+func fileDateFormat(year int) string {
+	format := "2006年1月2日"
+	if year <= 2010 {
+		format = "2006年01月02日"
+	}
+
+	return format
+}
+
 var lunarMap = map[rune]int{
 	'天': 0,
 	'初': 0,
@@ -70,18 +83,18 @@ var lunarMap = map[rune]int{
 	'十': 10,
 }
 
-var defaultHandler = new(Handler)
+var defaultHandler = New()
 
 type Handler struct {
 	cacheEnabled   bool
-	dateCache      map[int]map[string]*Result
-	lunarDateCache map[int]map[string]*Result
+	dateCache      map[int]map[Date]*Result
+	lunarDateCache map[int]map[Date]*Result
 }
 
 func New() *Handler {
 	return &Handler{
-		dateCache:      map[int]map[string]*Result{},
-		lunarDateCache: map[int]map[string]*Result{},
+		dateCache:      map[int]map[Date]*Result{},
+		lunarDateCache: map[int]map[Date]*Result{},
 	}
 }
 
@@ -90,14 +103,14 @@ func DateToLunarDate(d Date) (*Result, error) {
 }
 
 func (h *Handler) DateToLunarDate(d Date) (*Result, error) {
-	fileName := fmt.Sprintf("T%dc.txt", d.Year)
-	f, err := loadFileFunc(fileName)
+	f, err := loadFileFunc(fmt.Sprintf("T%dc.txt", d.Year))
 	if err != nil {
 		return nil, err
 	}
-
 	defer f.Close()
-	return h.find(f, d)
+
+	lunarMonth := 0
+	return h.find(f, d, true, d.Year, d.Year-1, &lunarMonth)
 }
 
 func LunarDateToDate(d Date) (*Result, error) {
@@ -105,14 +118,14 @@ func LunarDateToDate(d Date) (*Result, error) {
 }
 
 func (h *Handler) LunarDateToDate(d Date) (*Result, error) {
-	fileName := fmt.Sprintf("T%dc.txt", d.Year)
-	f, err := loadFileFunc(fileName)
+	f, err := loadFileFunc(fmt.Sprintf("T%dc.txt", d.Year))
 	if err != nil {
 		return nil, err
 	}
-
 	defer f.Close()
-	r, lunarMonth, err := h.query(f, d, d.Year-1, 0)
+
+	lunarMonth := 0
+	r, err := h.find(f, d, false, d.Year, d.Year-1, &lunarMonth)
 	if err == nil {
 		return r, nil
 	}
@@ -124,237 +137,175 @@ func (h *Handler) LunarDateToDate(d Date) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	defer f1.Close()
-	r, _, err = h.query(f1, d, d.Year, lunarMonth)
-	return r, err
 
+	return h.find(f1, d, false, d.Year+1, d.Year, &lunarMonth)
 }
 
-func (h *Handler) find(rd io.Reader, d Date) (*Result, error) {
-	format := "2006年1月2日"
-	if d.Year <= 2010 {
-		format = "2006年01月02日"
-	}
-	target := d.Time().Format(format)
-	r := bufio.NewReader(rd)
-
-	// skip first three lines
-	for i := 0; i < 3; i++ {
-		line, err := r.ReadString('\n')
-		if len(line) == 0 && err != nil {
-			return nil, err
-		}
-	}
-
-	lunarYear := d.Year - 1
-	lunarMonth := 0
-	var result *Result
-	for {
-		line, err := r.ReadString('\n')
-		if len(line) == 0 && err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-
-		fields := strings.Fields(line)
-		if len(fields) == 0 {
-			continue
-		}
-
-		rs := []rune(fields[1])
-		if rs[0] == rune('閏') {
-			rs = rs[1:]
-		}
-
-		isMonth := false
-		if rs[len(rs)-1] == rune('月') {
-			isMonth = true
-			rs = rs[:len(rs)-1]
-		}
-
-		lastChar := rs[len(rs)-1]
-		unitDigit := lunarMap[lastChar]
-		if lastChar == '正' {
-			lunarYear++
-		}
-
-		tensDigit := 0
-		if len(rs) > 1 {
-			tensDigit = lunarMap[rs[0]]
-			if tensDigit == 10 {
-				tensDigit = 1
-			}
-			if tensDigit != 0 && unitDigit == 10 {
-				tensDigit--
-			}
-		}
-
-		lunarDay := tensDigit*10 + unitDigit
-		if isMonth {
-			lunarMonth = lunarDay
-			lunarDay = 1
-		}
-
-		if result != nil && isMonth {
-			lunarMonth--
-			if lunarMonth == 0 {
-				lunarYear--
-				lunarMonth = 12
-			}
-
-			result.LunarDate = Date{lunarYear, lunarMonth, lunarDay}
-			return result, nil
-		}
-
-		if fields[0] != target {
-			continue
-		}
-
-		weekday := []rune(fields[2])
-		result = &Result{
-			Date:    d,
-			Weekday: time.Weekday(lunarMap[weekday[len(weekday)-1]]),
-		}
-		if len(fields) > 3 {
-			result.SolarTerm = fields[3]
-		}
-
-		if lunarMonth == 0 {
-			continue
-		}
-		result.LunarDate = Date{lunarYear, lunarMonth, lunarDay}
-		return result, nil
-	}
-
-	return nil, ErrNotFound
-}
-
-func (h *Handler) query(rd io.Reader, d Date, lunarYear, lunarMonth int) (*Result, int, error) {
-	fileName := fmt.Sprintf("T%dc.txt", d.Year)
-	f, err := loadFileFunc(fileName)
+func (h *Handler) find(rd io.Reader, d Date, dateToLunarDate bool, fileYear, lunarYear int, lunarMonth *int) (*Result, error) {
+	r, err := prepareReader(rd)
 	if err != nil {
-		return nil, 0, err
-	}
-	defer f.Close()
-
-	r := bufio.NewReader(rd)
-
-	// skip first three lines
-	for i := 0; i < 3; i++ {
-		line, err := r.ReadString('\n')
-		if len(line) == 0 && err != nil {
-			return nil, 0, err
-		}
+		return nil, err
 	}
 
-	var unknownMonthResults []*Result
 	var result *Result
+	unknownMonthResults := []*Result{}
 	for {
 		line, err := r.ReadString('\n')
 		if len(line) == 0 && err != nil {
 			if err == io.EOF {
 				break
 			}
-			return nil, 0, err
+			return nil, err
 		}
 
-		fields := strings.Fields(line)
-		if len(fields) == 0 {
+		res, newunknownMonthResults, err := h.parseLine(line, fileYear, lunarYear, *lunarMonth, unknownMonthResults)
+		if res == nil && err == nil {
 			continue
 		}
 
-		rs := []rune(fields[1])
-		if rs[0] == rune('閏') {
-			rs = rs[1:]
+		if err != nil {
+			return nil, err
 		}
+		lunarYear, *lunarMonth = res.LunarDate.Year, res.LunarDate.Month
 
-		isMonth := false
-		if rs[len(rs)-1] == rune('月') {
-			isMonth = true
-			rs = rs[:len(rs)-1]
-		}
-
-		lastChar := rs[len(rs)-1]
-		unitDigit := lunarMap[lastChar]
-		if lastChar == '正' {
-			lunarYear++
-		}
-
-		tensDigit := 0
-		if len(rs) > 1 {
-			tensDigit = lunarMap[rs[0]]
-			if tensDigit == 10 {
-				tensDigit = 1
+		if dateToLunarDate {
+			if res.Date.Equal(d) {
+				result = res
 			}
-			if tensDigit != 0 && unitDigit == 10 {
-				tensDigit--
-			}
-		}
-
-		lunarDay := tensDigit*10 + unitDigit
-		if isMonth {
-			lunarMonth = lunarDay
-			lunarDay = 1
-		}
-
-		if isMonth && len(unknownMonthResults) > 0 {
-			tmpLunarMonth := lunarMonth - 1
-			if tmpLunarMonth == 0 {
-				tmpLunarMonth = 12
+		} else {
+			if res.LunarDate.Equal(d) {
+				result = res
 			}
 
-			for _, v := range unknownMonthResults {
-				v.LunarDate.Month = tmpLunarMonth
-				if v.LunarDate.Equal(d) {
-					result = v
-					if !h.cacheEnabled {
-						return result, lunarMonth, nil
+			if len(unknownMonthResults) > 0 && len(newunknownMonthResults) == 0 {
+				for _, v := range unknownMonthResults {
+					if v.LunarDate.Equal(d) {
+						result = res
 					}
 				}
 			}
-			unknownMonthResults = nil
-
 		}
 
-		format := "2006年1月2日"
-		if d.Year <= 2010 {
-			format = "2006年01月02日"
-		}
-
-		t, err := time.Parse(format, fields[0])
-		if err != nil {
-			return nil, 0, fmt.Errorf("lunar: parse time error: %w", err)
-		}
-
-		weekday := []rune(fields[2])
-		res := &Result{
-			Date:      DateByTime(t),
-			LunarDate: Date{lunarYear, lunarMonth, lunarDay},
-			Weekday:   time.Weekday(lunarMap[weekday[len(weekday)-1]]),
-		}
-		if len(fields) > 3 {
-			res.SolarTerm = fields[3]
-		}
-
-		if lunarMonth == 0 {
-			unknownMonthResults = append(unknownMonthResults, res)
-			continue
-		}
-
-		if res.LunarDate.Equal(d) {
-			result = res
-			if !h.cacheEnabled {
-				return result, lunarMonth, nil
-			}
+		if result != nil && result.LunarDate.Valid() && !h.cacheEnabled {
+			return result, nil
 		}
 	}
 
-	if result != nil {
-		return result, lunarMonth, nil
+	if result == nil || !result.LunarDate.Valid() {
+		return nil, ErrNotFound
 	}
 
-	return nil, lunarMonth, ErrNotFound
+	return result, nil
+}
+
+func (h *Handler) parseLine(line string, fileYear int, lunarYear, lunarMonth int, unknownMonthResults []*Result) (*Result, []*Result, error) {
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return nil, nil, nil
+	}
+
+	rs := []rune(fields[1])
+	if rs[0] == rune('閏') {
+		rs = rs[1:]
+	}
+
+	isMonth := false
+	if rs[len(rs)-1] == rune('月') {
+		isMonth = true
+		rs = rs[:len(rs)-1]
+	}
+
+	lastChar := rs[len(rs)-1]
+	unitDigit := lunarMap[lastChar]
+	if lastChar == '正' {
+		lunarYear++
+	}
+
+	tensDigit := 0
+	if len(rs) > 1 {
+		tensDigit = lunarMap[rs[0]]
+		if tensDigit == 10 {
+			tensDigit = 1
+		}
+		if tensDigit != 0 && unitDigit == 10 {
+			tensDigit--
+		}
+	}
+
+	lunarDay := tensDigit*10 + unitDigit
+	if isMonth {
+		lunarMonth = lunarDay
+		lunarDay = 1
+	}
+
+	newunknownMonthResults := unknownMonthResults
+	if isMonth && len(unknownMonthResults) > 0 {
+		tmpLunarMonth := lunarMonth - 1
+		if tmpLunarMonth == 0 {
+			tmpLunarMonth = 12
+		}
+
+		for _, v := range unknownMonthResults {
+			v.LunarDate.Month = tmpLunarMonth
+			h.cache(v, fileYear)
+		}
+		newunknownMonthResults = []*Result{}
+	}
+
+	t, err := time.Parse(fileDateFormat(fileYear), fields[0])
+	if err != nil {
+		return nil, nil, fmt.Errorf("lunar: parse time error: %w", err)
+	}
+
+	weekday := []rune(fields[2])
+	r := &Result{
+		Date:      DateByTime(t),
+		LunarDate: Date{lunarYear, lunarMonth, lunarDay},
+		Weekday:   time.Weekday(lunarMap[weekday[len(weekday)-1]]),
+	}
+	if len(fields) > 3 {
+		r.SolarTerm = fields[3]
+	}
+
+	if lunarMonth == 0 {
+		newunknownMonthResults = append(unknownMonthResults, r)
+	} else {
+		h.cache(r, fileYear)
+	}
+
+	return r, newunknownMonthResults, nil
+}
+
+func (h *Handler) cache(r *Result, fileYear int) {
+	if h.cacheEnabled {
+		yearDateMap, ok := h.dateCache[fileYear]
+		if !ok {
+			yearDateMap = map[Date]*Result{}
+			h.dateCache[fileYear] = yearDateMap
+		}
+
+		yearLunarDateMap, ok := h.lunarDateCache[fileYear]
+		if !ok {
+			yearLunarDateMap = map[Date]*Result{}
+			h.lunarDateCache[fileYear] = yearLunarDateMap
+		}
+
+		yearDateMap[r.Date] = r
+		yearLunarDateMap[r.LunarDate] = r
+	}
+}
+
+func prepareReader(rd io.Reader) (*bufio.Reader, error) {
+	r := bufio.NewReader(rd)
+
+	// skip first three lines
+	for i := 0; i < 3; i++ {
+		line, err := r.ReadString('\n')
+		if len(line) == 0 && err != nil {
+			return nil, err
+		}
+	}
+
+	return r, nil
 }
