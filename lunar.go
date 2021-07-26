@@ -85,17 +85,28 @@ var lunarMap = map[rune]int{
 
 var defaultHandler = New()
 
+type fileCache struct {
+	dateCache      map[Date]*Result
+	lunarDateCache map[Date]*Result
+}
+
 type Handler struct {
-	cacheEnabled   bool
-	dateCache      map[int]map[Date]*Result
-	lunarDateCache map[int]map[Date]*Result
+	cacheEnabled bool
+	cacheMap     map[int]*fileCache
 }
 
 func New() *Handler {
 	return &Handler{
-		dateCache:      map[int]map[Date]*Result{},
-		lunarDateCache: map[int]map[Date]*Result{},
+		cacheMap: map[int]*fileCache{},
 	}
+}
+
+func Cache(enabled bool) {
+	defaultHandler.cacheEnabled = enabled
+}
+
+func (h *Handler) Cache(enabled bool) {
+	h.cacheEnabled = enabled
 }
 
 func DateToLunarDate(d Date) (*Result, error) {
@@ -103,6 +114,13 @@ func DateToLunarDate(d Date) (*Result, error) {
 }
 
 func (h *Handler) DateToLunarDate(d Date) (*Result, error) {
+	if h.cacheEnabled {
+		_, r := h.queryCache(d.Year, d, true)
+		if r != nil {
+			return r, nil
+		}
+	}
+
 	f, err := loadFileFunc(fmt.Sprintf("T%dc.txt", d.Year))
 	if err != nil {
 		return nil, err
@@ -118,19 +136,35 @@ func LunarDateToDate(d Date) (*Result, error) {
 }
 
 func (h *Handler) LunarDateToDate(d Date) (*Result, error) {
-	f, err := loadFileFunc(fmt.Sprintf("T%dc.txt", d.Year))
-	if err != nil {
-		return nil, err
+	fileLoaded := false
+	if h.cacheEnabled {
+		var r *Result
+		fileLoaded, r = h.queryCache(d.Year, d, false)
+		if r != nil {
+			return r, nil
+		}
+
+		_, r = h.queryCache(d.Year+1, d, false)
+		if r != nil {
+			return r, nil
+		}
 	}
-	defer f.Close()
 
 	lunarMonth := 0
-	r, err := h.find(f, d, false, d.Year, d.Year-1, &lunarMonth)
-	if err == nil {
-		return r, nil
-	}
-	if err != ErrNotFound {
-		return nil, err
+	if !fileLoaded {
+		f, err := loadFileFunc(fmt.Sprintf("T%dc.txt", d.Year))
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		r, err := h.find(f, d, false, d.Year, d.Year-1, &lunarMonth)
+		if err == nil {
+			return r, nil
+		}
+		if err != ErrNotFound {
+			return nil, err
+		}
 	}
 
 	f1, err := loadFileFunc(fmt.Sprintf("T%dc.txt", d.Year+1))
@@ -279,21 +313,31 @@ func (h *Handler) parseLine(line string, fileYear int, lunarYear, lunarMonth int
 
 func (h *Handler) cache(r *Result, fileYear int) {
 	if h.cacheEnabled {
-		yearDateMap, ok := h.dateCache[fileYear]
+		c, ok := h.cacheMap[fileYear]
 		if !ok {
-			yearDateMap = map[Date]*Result{}
-			h.dateCache[fileYear] = yearDateMap
+			c = &fileCache{
+				dateCache:      map[Date]*Result{},
+				lunarDateCache: map[Date]*Result{},
+			}
+			h.cacheMap[fileYear] = c
 		}
 
-		yearLunarDateMap, ok := h.lunarDateCache[fileYear]
-		if !ok {
-			yearLunarDateMap = map[Date]*Result{}
-			h.lunarDateCache[fileYear] = yearLunarDateMap
-		}
-
-		yearDateMap[r.Date] = r
-		yearLunarDateMap[r.LunarDate] = r
+		c.dateCache[r.Date] = r
+		c.lunarDateCache[r.LunarDate] = r
 	}
+}
+
+func (h *Handler) queryCache(fileYear int, d Date, dateToLunarDate bool) (bool, *Result) {
+	c, loaded := h.cacheMap[fileYear]
+	var r *Result
+	if dateToLunarDate {
+		r = c.dateCache[d]
+	} else {
+		r = c.lunarDateCache[d]
+	}
+
+	fmt.Println(loaded, r)
+	return loaded, r
 }
 
 func prepareReader(rd io.Reader) (*bufio.Reader, error) {
