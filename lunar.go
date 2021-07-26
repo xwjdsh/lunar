@@ -329,6 +329,10 @@ func (h *Handler) cache(r *Result, fileYear int) {
 
 func (h *Handler) queryCache(fileYear int, d Date, dateToLunarDate bool) (bool, *Result) {
 	c, loaded := h.cacheMap[fileYear]
+	if !loaded {
+		return false, nil
+	}
+
 	var r *Result
 	if dateToLunarDate {
 		r = c.dateCache[d]
@@ -336,8 +340,7 @@ func (h *Handler) queryCache(fileYear int, d Date, dateToLunarDate bool) (bool, 
 		r = c.lunarDateCache[d]
 	}
 
-	fmt.Println(loaded, r)
-	return loaded, r
+	return true, r
 }
 
 func prepareReader(rd io.Reader) (*bufio.Reader, error) {
