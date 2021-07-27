@@ -141,17 +141,13 @@ func LunarDateToDate(d Date) (*Result, error) {
 
 func (h *Handler) LunarDateToDate(d Date) (*Result, error) {
 	fileLoaded := false
+	var r *Result
 	if h.cacheEnabled {
-		var r *Result
 		fileLoaded, r = h.queryCache(d.Year, d, false)
 		if r != nil {
 			return r, nil
 		}
 
-		_, r = h.queryCache(d.Year+1, d, false)
-		if r != nil {
-			return r, nil
-		}
 	}
 
 	lunarMonth := 0
@@ -171,13 +167,22 @@ func (h *Handler) LunarDateToDate(d Date) (*Result, error) {
 		}
 	}
 
-	f1, err := loadFileFunc(fmt.Sprintf("T%dc.txt", d.Year+1))
-	if err != nil {
-		return nil, err
+	if h.cacheEnabled {
+		fileLoaded, r = h.queryCache(d.Year+1, d, false)
+		if r != nil {
+			return r, nil
+		}
 	}
-	defer f1.Close()
+	if !fileLoaded {
+		f1, err := loadFileFunc(fmt.Sprintf("T%dc.txt", d.Year+1))
+		if err != nil {
+			return nil, err
+		}
+		defer f1.Close()
+		return h.find(f1, d, false, d.Year+1, d.Year, &lunarMonth)
+	}
 
-	return h.find(f1, d, false, d.Year+1, d.Year, &lunarMonth)
+	return nil, ErrNotFound
 }
 
 func (h *Handler) find(rd io.Reader, d Date, dateToLunarDate bool, fileYear, lunarYear int, lunarMonth *int) (*Result, error) {
@@ -225,6 +230,7 @@ func (h *Handler) find(rd io.Reader, d Date, dateToLunarDate bool, fileYear, lun
 			}
 		}
 
+		unknownMonthResults = newunknownMonthResults
 		if result != nil && result.LunarDate.Valid() && !h.cacheEnabled {
 			return result, nil
 		}
