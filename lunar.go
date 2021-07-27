@@ -32,6 +32,10 @@ type Date struct {
 	Day   int
 }
 
+func NewDate(y, m, d int) Date {
+	return Date{Year: y, Month: m, Day: d}
+}
+
 func DateByTime(t time.Time) Date {
 	year, month, day := t.Date()
 	return Date{

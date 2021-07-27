@@ -16,6 +16,36 @@ var (
 	reverseMode = flag.Bool("r", false, "reverse mode, find date by lunar date")
 )
 
+type alias struct {
+	d           lunar.Date
+	isLunarDate bool
+	isHoliday   bool
+}
+
+func newAlias(d lunar.Date, isLunarDate, isHoliday bool) *alias {
+	return &alias{
+		d:           d,
+		isLunarDate: isLunarDate,
+		isHoliday:   isHoliday,
+	}
+}
+
+var aliasMap = map[string]*alias{
+	"春节": newAlias(lunar.NewDate(0, 1, 1), true, true),
+	"元旦": newAlias(lunar.NewDate(0, 1, 1), false, true),
+	"元宵": newAlias(lunar.NewDate(0, 1, 15), true, false),
+	"清明": newAlias(lunar.NewDate(0, 4, 4), false, true),
+	"劳动": newAlias(lunar.NewDate(0, 5, 4), false, true),
+	"端午": newAlias(lunar.NewDate(0, 5, 5), true, true),
+	"七夕": newAlias(lunar.NewDate(0, 7, 7), true, false),
+	"中元": newAlias(lunar.NewDate(0, 7, 15), true, false),
+	"中秋": newAlias(lunar.NewDate(0, 8, 15), true, true),
+	"重阳": newAlias(lunar.NewDate(0, 9, 9), true, false),
+	"国庆": newAlias(lunar.NewDate(0, 10, 1), false, true),
+	"下元": newAlias(lunar.NewDate(0, 10, 15), true, false),
+	"腊八": newAlias(lunar.NewDate(0, 12, 8), true, false),
+}
+
 func main() {
 	flag.Parse()
 
@@ -25,11 +55,16 @@ func main() {
 	}
 
 	if args := flag.Args(); len(args) > 0 {
-		t, err := time.Parse("0102", args[0])
-		if err != nil {
-			log.Fatal(err)
+		s := args[0]
+		if v, ok := aliasMap[s]; ok {
+			d.Month, d.Day = v.d.Month, v.d.Day
+		} else {
+			t, err := time.Parse("0102", s)
+			if err != nil {
+				log.Fatal(err)
+			}
+			d.Month, d.Day = int(t.Month()), t.Day()
 		}
-		d.Month, d.Day = int(t.Month()), t.Day()
 	}
 
 	var (
@@ -47,5 +82,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	fmt.Println(resultDate.Time().Format(*format))
 }
