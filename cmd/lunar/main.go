@@ -108,7 +108,7 @@ func outputResults(rs []*lunar.Result, dateFormat string) {
 		row := []string{
 			r.Date.Time().Format(dateFormat),
 			r.LunarDate.Time().Format(dateFormat),
-			r.Weekday.String(),
+			r.WeekdayRaw,
 			r.SolarTerm,
 		}
 
@@ -124,9 +124,9 @@ func outputResults(rs []*lunar.Result, dateFormat string) {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	header := []string{"Date", "Lunar Date", "Weekday", "Solar Term"}
+	header := []string{"公历", "农历", "星期", "节气"}
 	if showAliases {
-		header = append(header, "Aliases")
+		header = append(header, "别名")
 	}
 	table.SetHeader(header)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)

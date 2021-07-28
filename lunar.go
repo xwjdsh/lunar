@@ -78,11 +78,12 @@ func init() {
 }
 
 type Result struct {
-	Aliases   []Alias
-	Date      Date
-	LunarDate Date
-	Weekday   time.Weekday
-	SolarTerm string
+	Aliases    []Alias
+	Date       Date
+	LunarDate  Date
+	Weekday    time.Weekday
+	WeekdayRaw string
+	SolarTerm  string
 }
 
 type Date struct {
@@ -406,9 +407,10 @@ func (h *Handler) parseLine(line string, fileYear int, lunarYear, lunarMonth int
 
 	weekday := []rune(fields[2])
 	r := &Result{
-		Date:      DateByTime(t),
-		LunarDate: NewDate(lunarYear, lunarMonth, lunarDay),
-		Weekday:   time.Weekday(lunarMap[weekday[len(weekday)-1]]),
+		Date:       DateByTime(t),
+		LunarDate:  NewDate(lunarYear, lunarMonth, lunarDay),
+		WeekdayRaw: fields[2],
+		Weekday:    time.Weekday(lunarMap[weekday[len(weekday)-1]]),
 	}
 	if len(fields) > 3 {
 		r.SolarTerm = fields[3]
