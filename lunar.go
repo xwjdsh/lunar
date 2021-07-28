@@ -198,19 +198,25 @@ func (h *Handler) aliases(year int, filterFunc func(*Alias) bool) ([]*Result, er
 
 		d := a.Date
 		d.Year = year
-		var (
-			r   *Result
-			err error
-		)
 		if a.IsLunarDate {
-			r, err = h.LunarDateToDate(d)
+			for _, y := range []int{year - 1, year} {
+				d := a.Date
+				d.Year = y
+				r, err := h.LunarDateToDate(d)
+				if err != nil {
+					return nil, err
+				}
+				if r.Date.Year == year {
+					rs = append(rs, r)
+				}
+			}
 		} else {
-			r, err = h.DateToLunarDate(d)
+			r, err := h.DateToLunarDate(d)
+			if err != nil {
+				return nil, err
+			}
+			rs = append(rs, r)
 		}
-		if err != nil {
-			return nil, err
-		}
-		rs = append(rs, r)
 	}
 
 	return rs, nil
