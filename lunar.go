@@ -190,7 +190,21 @@ func (h *Handler) Aliases(year int) ([]*Result, error) {
 }
 
 func (h *Handler) aliases(year int, filterFunc func(*Alias) bool) ([]*Result, error) {
-	var rs []*Result
+	var (
+		rs []*Result
+		dm = map[Date]bool{}
+	)
+
+	addToResults := func(r *Result) {
+		// eg. 2001-10-01, 既是国庆也是中秋
+		if dm[r.Date] {
+			return
+		}
+
+		rs = append(rs, r)
+		dm[r.Date] = true
+	}
+
 	for _, a := range commonAliases {
 		if filterFunc != nil && !filterFunc(a) {
 			continue
@@ -207,7 +221,7 @@ func (h *Handler) aliases(year int, filterFunc func(*Alias) bool) ([]*Result, er
 					return nil, err
 				}
 				if r.Date.Year == year {
-					rs = append(rs, r)
+					addToResults(r)
 				}
 			}
 		} else {
@@ -215,7 +229,7 @@ func (h *Handler) aliases(year int, filterFunc func(*Alias) bool) ([]*Result, er
 			if err != nil {
 				return nil, err
 			}
-			rs = append(rs, r)
+			addToResults(r)
 		}
 	}
 
