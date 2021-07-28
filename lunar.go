@@ -19,7 +19,66 @@ var (
 	loadFileFunc func(string) (io.ReadCloser, error)
 )
 
+type Alias struct {
+	Name        string
+	Date        Date
+	IsLunarDate bool
+	IsHoliday   bool
+}
+
+func NewAlias(name string, d Date, isLunarDate, isHoliday bool) *Alias {
+	return &Alias{
+		Name:        name,
+		Date:        d,
+		IsLunarDate: isLunarDate,
+		IsHoliday:   isHoliday,
+	}
+}
+
+var commonAliases = []*Alias{
+	NewAlias("春节", NewDate(0, 1, 1), true, true),
+	NewAlias("元旦", NewDate(0, 1, 1), false, true),
+	NewAlias("元宵", NewDate(0, 1, 15), true, false),
+	NewAlias("清明", NewDate(0, 4, 4), false, true),
+	NewAlias("劳动", NewDate(0, 5, 4), false, true),
+	NewAlias("端午", NewDate(0, 5, 5), true, true),
+	NewAlias("七夕", NewDate(0, 7, 7), true, false),
+	NewAlias("中元", NewDate(0, 7, 15), true, false),
+	NewAlias("中秋", NewDate(0, 8, 15), true, true),
+	NewAlias("重阳", NewDate(0, 9, 9), true, false),
+	NewAlias("国庆", NewDate(0, 10, 1), false, true),
+	NewAlias("下元", NewDate(0, 10, 15), true, false),
+	NewAlias("腊八", NewDate(0, 12, 8), true, false),
+}
+
+func GetAlias(name string) (Alias, bool) {
+	a := aliasMap[name]
+	if a != nil {
+		return *a, true
+	}
+
+	return Alias{}, false
+}
+
+var (
+	aliasMap       = map[string]*Alias{}
+	dateToAliasMap = map[dateWithLunar]*Alias{}
+)
+
+type dateWithLunar struct {
+	isLunar bool
+	Date
+}
+
+func init() {
+	for _, a := range commonAliases {
+		aliasMap[a.Name] = a
+		dateToAliasMap[dateWithLunar{Date: a.Date, isLunar: a.IsLunarDate}] = a
+	}
+}
+
 type Result struct {
+	Aliases   []Alias
 	Date      Date
 	LunarDate Date
 	Weekday   time.Weekday
@@ -50,7 +109,7 @@ func (d Date) Time() time.Time {
 }
 
 func (d Date) Equal(d1 Date) bool {
-	return d.Year == d1.Year && d.Month == d1.Month && d.Day == d1.Day
+	return d == d1
 }
 
 func (d Date) String() string {
@@ -111,6 +170,49 @@ func Cache(enabled bool) {
 
 func (h *Handler) Cache(enabled bool) {
 	h.cacheEnabled = enabled
+}
+
+func Holidays(year int) ([]*Result, error) {
+	return defaultHandler.Holidays(year)
+}
+
+func (h *Handler) Holidays(year int) ([]*Result, error) {
+	return h.aliases(year, func(a *Alias) bool { return a.IsHoliday })
+}
+
+func Aliases(year int) ([]*Result, error) {
+	return defaultHandler.Aliases(year)
+}
+
+func (h *Handler) Aliases(year int) ([]*Result, error) {
+	return h.aliases(year, nil)
+}
+
+func (h *Handler) aliases(year int, filterFunc func(*Alias) bool) ([]*Result, error) {
+	var rs []*Result
+	for _, a := range commonAliases {
+		if filterFunc != nil && !filterFunc(a) {
+			continue
+		}
+
+		d := a.Date
+		d.Year = year
+		var (
+			r   *Result
+			err error
+		)
+		if a.IsLunarDate {
+			r, err = h.LunarDateToDate(d)
+		} else {
+			r, err = h.DateToLunarDate(d)
+		}
+		if err != nil {
+			return nil, err
+		}
+		rs = append(rs, r)
+	}
+
+	return rs, nil
 }
 
 func DateToLunarDate(d Date) (*Result, error) {
@@ -305,7 +407,7 @@ func (h *Handler) parseLine(line string, fileYear int, lunarYear, lunarMonth int
 	weekday := []rune(fields[2])
 	r := &Result{
 		Date:      DateByTime(t),
-		LunarDate: Date{lunarYear, lunarMonth, lunarDay},
+		LunarDate: NewDate(lunarYear, lunarMonth, lunarDay),
 		Weekday:   time.Weekday(lunarMap[weekday[len(weekday)-1]]),
 	}
 	if len(fields) > 3 {
@@ -322,6 +424,15 @@ func (h *Handler) parseLine(line string, fileYear int, lunarYear, lunarMonth int
 }
 
 func (h *Handler) cache(r *Result, fileYear int) {
+	d := NewDate(0, r.Date.Month, r.Date.Day)
+	if a, ok := dateToAliasMap[dateWithLunar{Date: d, isLunar: false}]; ok {
+		r.Aliases = append(r.Aliases, *a)
+	}
+
+	d = NewDate(0, r.LunarDate.Month, r.LunarDate.Day)
+	if a, ok := dateToAliasMap[dateWithLunar{Date: d, isLunar: true}]; ok {
+		r.Aliases = append(r.Aliases, *a)
+	}
 	if h.cacheEnabled {
 		c, ok := h.cacheMap[fileYear]
 		if !ok {

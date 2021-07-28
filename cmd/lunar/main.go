@@ -1,87 +1,165 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"log"
+	"os"
+	"strings"
 	"time"
+
+	"github.com/olekukonko/tablewriter"
+	"github.com/urfave/cli/v2"
 
 	"github.com/xwjdsh/lunar"
 )
 
-var (
-	CST         = time.FixedZone("CST", 3600*8)
-	format      = flag.String("f", "2006-01-02", "time format")
-	year        = flag.Int("y", 0, "year")
-	reverseMode = flag.Bool("r", false, "reverse mode, find date by lunar date")
-)
-
-type alias struct {
-	d           lunar.Date
-	isLunarDate bool
-	isHoliday   bool
-}
-
-func newAlias(d lunar.Date, isLunarDate, isHoliday bool) *alias {
-	return &alias{
-		d:           d,
-		isLunarDate: isLunarDate,
-		isHoliday:   isHoliday,
-	}
-}
-
-var aliasMap = map[string]*alias{
-	"春节": newAlias(lunar.NewDate(0, 1, 1), true, true),
-	"元旦": newAlias(lunar.NewDate(0, 1, 1), false, true),
-	"元宵": newAlias(lunar.NewDate(0, 1, 15), true, false),
-	"清明": newAlias(lunar.NewDate(0, 4, 4), false, true),
-	"劳动": newAlias(lunar.NewDate(0, 5, 4), false, true),
-	"端午": newAlias(lunar.NewDate(0, 5, 5), true, true),
-	"七夕": newAlias(lunar.NewDate(0, 7, 7), true, false),
-	"中元": newAlias(lunar.NewDate(0, 7, 15), true, false),
-	"中秋": newAlias(lunar.NewDate(0, 8, 15), true, true),
-	"重阳": newAlias(lunar.NewDate(0, 9, 9), true, false),
-	"国庆": newAlias(lunar.NewDate(0, 10, 1), false, true),
-	"下元": newAlias(lunar.NewDate(0, 10, 15), true, false),
-	"腊八": newAlias(lunar.NewDate(0, 12, 8), true, false),
-}
+var CST = time.FixedZone("CST", 3600*8)
 
 func main() {
-	flag.Parse()
+	app := &cli.App{
+		Name:  "lunar",
+		Usage: "lunar is a command line tool for conversion between Gregorian calendar and lunar calendar.(1901~2100)",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "format",
+				Aliases: []string{"f"},
+				Value:   "2006-01-02",
+				Usage:   "output date format",
+			},
+			&cli.IntFlag{
+				Name:    "year",
+				Aliases: []string{"y"},
+				Value:   0,
+				Usage:   "target year",
+			},
+			&cli.BoolFlag{
+				Name:    "reverse",
+				Aliases: []string{"r"},
+				Value:   false,
+				Usage:   "reverse mode, query by lunar date",
+			},
+		},
+		Commands: []*cli.Command{
+			{
+				Name:    "holidays",
+				Aliases: []string{"h"},
+				Usage:   "show holidays date info",
+				Action: func(c *cli.Context) error {
+					var results []*lunar.Result
+					d := currentDate(c.Int("year"))
+					results, err := lunar.Holidays(d.Year)
+					if err != nil {
+						return err
+					}
 
-	d := lunar.DateByTime(time.Now().In(CST))
-	if *year != 0 {
-		d.Year = *year
-	}
+					outputResults(results, c.String("format"))
+					return nil
+				},
+			},
+			{
+				Name:    "aliases",
+				Aliases: []string{"h"},
+				Usage:   "show aliases date info",
+				Action: func(c *cli.Context) error {
+					var results []*lunar.Result
+					d := currentDate(c.Int("year"))
+					results, err := lunar.Aliases(d.Year)
+					if err != nil {
+						return err
+					}
 
-	if args := flag.Args(); len(args) > 0 {
-		s := args[0]
-		if v, ok := aliasMap[s]; ok {
-			d.Month, d.Day = v.d.Month, v.d.Day
-		} else {
-			t, err := time.Parse("0102", s)
-			if err != nil {
-				log.Fatal(err)
+					outputResults(results, c.String("format"))
+					return nil
+				},
+			},
+		},
+		Action: func(c *cli.Context) error {
+			d := currentDate(c.Int("year"))
+			if s := c.Args().First(); s != "" {
+				if v, ok := lunar.GetAlias(s); ok {
+					d.Month, d.Day = v.Date.Month, v.Date.Day
+				} else {
+					t, err := time.Parse("0102", s)
+					if err != nil {
+						log.Fatal(err)
+					}
+					d.Month, d.Day = int(t.Month()), t.Day()
+				}
 			}
-			d.Month, d.Day = int(t.Month()), t.Day()
-		}
+
+			result, _, err := getLunarResult(d, c.Bool("reverse"))
+			if err != nil {
+				return err
+			}
+			outputResults([]*lunar.Result{result}, c.String("format"))
+			return nil
+		},
 	}
 
+	err := app.Run(os.Args)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func outputResults(rs []*lunar.Result, dateFormat string) {
+	data := make([][]string, len(rs))
+	showAliases := false
+	for i, r := range rs {
+		row := []string{
+			r.Date.Time().Format(dateFormat),
+			r.LunarDate.Time().Format(dateFormat),
+			r.Weekday.String(),
+			r.SolarTerm,
+		}
+
+		aliases := []string{}
+		for _, a := range r.Aliases {
+			aliases = append(aliases, a.Name)
+		}
+		if len(aliases) > 0 {
+			row = append(row, strings.Join(aliases, ","))
+			showAliases = true
+		}
+		data[i] = row
+	}
+
+	table := tablewriter.NewWriter(os.Stdout)
+	header := []string{"Date", "Lunar Date", "Weekday", "Solar Term"}
+	if showAliases {
+		header = append(header, "Aliases")
+	}
+	table.SetHeader(header)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.AppendBulk(data)
+	table.Render()
+}
+
+func getLunarResult(d lunar.Date, reverse bool) (*lunar.Result, lunar.Date, error) {
 	var (
 		result     *lunar.Result
 		err        error
 		resultDate lunar.Date
 	)
-	if *reverseMode {
+	if reverse {
 		result, err = lunar.LunarDateToDate(d)
-		resultDate = result.Date
+		if err == nil {
+			resultDate = result.Date
+		}
 	} else {
 		result, err = lunar.DateToLunarDate(d)
-		resultDate = result.LunarDate
-	}
-	if err != nil {
-		log.Fatal(err)
+		if err == nil {
+			resultDate = result.LunarDate
+		}
 	}
 
-	fmt.Println(resultDate.Time().Format(*format))
+	return result, resultDate, err
+}
+
+func currentDate(year int) lunar.Date {
+	d := lunar.DateByTime(time.Now().In(CST))
+	if year != 0 {
+		d.Year = year
+	}
+
+	return d
 }
