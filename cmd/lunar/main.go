@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -102,6 +103,18 @@ func main() {
 }
 
 func outputResults(rs []*lunar.Result, dateFormat string) {
+	sort.Slice(rs, func(i, j int) bool {
+		di, dj := rs[i].Date, rs[j].Date
+		if di.Year != dj.Year {
+			return di.Year < dj.Year
+		}
+		if di.Month != dj.Month {
+			return di.Month < dj.Month
+		}
+
+		return di.Day < dj.Day
+	})
+
 	data := make([][]string, len(rs))
 	showAliases := false
 	for i, r := range rs {
