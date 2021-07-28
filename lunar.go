@@ -40,7 +40,7 @@ var commonAliases = []*Alias{
 	NewAlias("元旦", NewDate(0, 1, 1), false, true),
 	NewAlias("元宵", NewDate(0, 1, 15), true, false),
 	NewAlias("清明", NewDate(0, 4, 4), false, true),
-	NewAlias("劳动", NewDate(0, 5, 4), false, true),
+	NewAlias("劳动", NewDate(0, 5, 1), false, true),
 	NewAlias("端午", NewDate(0, 5, 5), true, true),
 	NewAlias("七夕", NewDate(0, 7, 7), true, false),
 	NewAlias("中元", NewDate(0, 7, 15), true, false),
