@@ -58,12 +58,12 @@ func main() {
 			},
 			{
 				Name:    "aliases",
-				Aliases: []string{"h"},
+				Aliases: []string{"as"},
 				Usage:   "show aliases date info",
 				Action: func(c *cli.Context) error {
 					var results []*lunar.Result
 					d := currentDate(c.Int("year"))
-					results, err := lunar.Aliases(d.Year)
+					results, err := lunar.GetAliases(d.Year)
 					if err != nil {
 						return err
 					}
@@ -72,19 +72,30 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:    "alias",
+				Aliases: []string{"a"},
+				Usage:   "show alias date info",
+				Action: func(c *cli.Context) error {
+					d := currentDate(c.Int("year"))
+					r, err := lunar.GetAlias(c.Args().First(), d.Year)
+					if err != nil {
+						return err
+					}
+
+					outputResults([]*lunar.Result{r}, c.String("format"))
+					return nil
+				},
+			},
 		},
 		Action: func(c *cli.Context) error {
 			d := currentDate(c.Int("year"))
 			if s := c.Args().First(); s != "" {
-				if v, ok := lunar.GetAlias(s); ok {
-					d.Month, d.Day = v.Date.Month, v.Date.Day
-				} else {
-					t, err := time.Parse("0102", s)
-					if err != nil {
-						log.Fatal(err)
-					}
-					d.Month, d.Day = int(t.Month()), t.Day()
+				t, err := time.Parse("0102", s)
+				if err != nil {
+					return err
 				}
+				d.Month, d.Day = int(t.Month()), t.Day()
 			}
 
 			result, _, err := getLunarResult(d, c.Bool("reverse"))

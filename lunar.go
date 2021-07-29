@@ -51,15 +51,6 @@ var commonAliases = []*Alias{
 	NewAlias("腊八", NewDate(0, 12, 8), true, false),
 }
 
-func GetAlias(name string) (Alias, bool) {
-	a := aliasMap[name]
-	if a != nil {
-		return *a, true
-	}
-
-	return Alias{}, false
-}
-
 var (
 	aliasMap       = map[string]*Alias{}
 	dateToAliasMap = map[dateWithLunar]*Alias{}
@@ -178,59 +169,52 @@ func Holidays(year int) ([]*Result, error) {
 }
 
 func (h *Handler) Holidays(year int) ([]*Result, error) {
-	return h.aliases(year, func(a *Alias) bool { return a.IsHoliday })
+	return h.getAliases(year, func(a *Alias) bool { return a.IsHoliday })
 }
 
-func Aliases(year int) ([]*Result, error) {
-	return defaultHandler.Aliases(year)
+func GetAlias(name string, year int) (*Result, error) {
+	return defaultHandler.GetAlias(name, year)
 }
 
-func (h *Handler) Aliases(year int) ([]*Result, error) {
-	return h.aliases(year, nil)
+func (h *Handler) GetAlias(name string, year int) (*Result, error) {
+	a, ok := aliasMap[name]
+	if !ok {
+		return nil, fmt.Errorf("lunar: alias %s not found", name)
+	}
+
+	return h.getAliasResult(a, year)
 }
 
-func (h *Handler) aliases(year int, filterFunc func(*Alias) bool) ([]*Result, error) {
+func GetAliases(year int) ([]*Result, error) {
+	return defaultHandler.GetAliases(year)
+}
+
+func (h *Handler) GetAliases(year int) ([]*Result, error) {
+	return h.getAliases(year, nil)
+}
+
+func (h *Handler) getAliases(year int, filterFunc func(*Alias) bool) ([]*Result, error) {
 	var (
 		rs []*Result
 		dm = map[Date]bool{}
 	)
-
-	addToResults := func(r *Result) {
-		// eg. 2001-10-01, 既是国庆也是中秋
-		if dm[r.Date] {
-			return
-		}
-
-		rs = append(rs, r)
-		dm[r.Date] = true
-	}
 
 	for _, a := range commonAliases {
 		if filterFunc != nil && !filterFunc(a) {
 			continue
 		}
 
-		d := a.Date
-		d.Year = year
-		if a.IsLunarDate {
-			for _, y := range []int{year - 1, year} {
-				d := a.Date
-				d.Year = y
-				r, err := h.LunarDateToDate(d)
-				if err != nil {
-					return nil, err
-				}
-				if r.Date.Year == year {
-					addToResults(r)
-				}
-			}
-		} else {
-			r, err := h.DateToLunarDate(d)
-			if err != nil {
-				return nil, err
-			}
-			addToResults(r)
+		r, err := h.getAliasResult(a, year)
+		if err != nil {
+			return nil, err
 		}
+		if dm[r.Date] {
+			// eg. 2001-10-01, 既是国庆也是中秋
+			continue
+		}
+
+		rs = append(rs, r)
+		dm[r.Date] = true
 	}
 
 	return rs, nil
@@ -498,4 +482,25 @@ func prepareReader(rd io.Reader) (*bufio.Reader, error) {
 	}
 
 	return r, nil
+}
+
+func (h *Handler) getAliasResult(a *Alias, year int) (*Result, error) {
+	d := a.Date
+	if !a.IsLunarDate {
+		d.Year = year
+		return h.DateToLunarDate(d)
+	}
+
+	for _, y := range []int{year, year - 1} {
+		d.Year = y
+		r, err := h.LunarDateToDate(d)
+		if err != nil {
+			return nil, err
+		}
+		if r.Date.Year == year {
+			return r, nil
+		}
+	}
+
+	return nil, ErrNotFound
 }
