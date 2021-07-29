@@ -32,12 +32,6 @@ func main() {
 				Value:   0,
 				Usage:   "target year",
 			},
-			&cli.BoolFlag{
-				Name:    "reverse",
-				Aliases: []string{"r"},
-				Value:   false,
-				Usage:   "reverse mode, query by lunar date",
-			},
 		},
 		Commands: []*cli.Command{
 			{
@@ -87,23 +81,17 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:    "reverse",
+				Aliases: []string{"r"},
+				Usage:   "reverse mode, query date by lunar date",
+				Action: func(c *cli.Context) error {
+					return queryAndDisplay(c, true)
+				},
+			},
 		},
 		Action: func(c *cli.Context) error {
-			d := currentDate(c.Int("year"))
-			if s := c.Args().First(); s != "" {
-				t, err := time.Parse("0102", s)
-				if err != nil {
-					return err
-				}
-				d.Month, d.Day = int(t.Month()), t.Day()
-			}
-
-			result, _, err := getLunarResult(d, c.Bool("reverse"))
-			if err != nil {
-				return err
-			}
-			outputResults([]*lunar.Result{result}, c.String("format"))
-			return nil
+			return queryAndDisplay(c, false)
 		},
 	}
 
@@ -179,4 +167,22 @@ func currentDate(year int) lunar.Date {
 	}
 
 	return d
+}
+
+func queryAndDisplay(c *cli.Context, reverse bool) error {
+	d := currentDate(c.Int("year"))
+	if s := c.Args().First(); s != "" {
+		t, err := time.Parse("0102", s)
+		if err != nil {
+			return err
+		}
+		d.Month, d.Day = int(t.Month()), t.Day()
+	}
+
+	result, _, err := getLunarResult(d, reverse)
+	if err != nil {
+		return err
+	}
+	outputResults([]*lunar.Result{result}, c.String("format"))
+	return nil
 }
