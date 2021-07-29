@@ -127,7 +127,6 @@ func outputResults(rs []*lunar.Result, dateFormat string) {
 	})
 
 	data := make([][]string, len(rs))
-	showAliases := false
 	for i, r := range rs {
 		row := []string{
 			r.Date.Time().Format(dateFormat),
@@ -140,18 +139,12 @@ func outputResults(rs []*lunar.Result, dateFormat string) {
 		for _, a := range r.Aliases {
 			aliases = append(aliases, a.Name)
 		}
-		if len(aliases) > 0 {
-			row = append(row, strings.Join(aliases, ","))
-			showAliases = true
-		}
+		row = append(row, strings.Join(aliases, ","))
 		data[i] = row
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	header := []string{"公历", "农历", "星期", "节气"}
-	if showAliases {
-		header = append(header, "别名")
-	}
+	header := []string{"公历", "农历", "星期", "节气", "别名"}
 	table.SetHeader(header)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.AppendBulk(data)
