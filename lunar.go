@@ -157,11 +157,12 @@ func New() *Handler {
 }
 
 func Cache(enabled bool) {
-	defaultHandler.cacheEnabled = enabled
+	defaultHandler.Cache(enabled)
 }
 
-func (h *Handler) Cache(enabled bool) {
+func (h *Handler) Cache(enabled bool) *Handler {
 	h.cacheEnabled = enabled
+	return h
 }
 
 func Holidays(year int) ([]*Result, error) {
