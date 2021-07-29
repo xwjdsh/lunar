@@ -173,6 +173,55 @@ func (h *Handler) Holidays(year int) ([]*Result, error) {
 	return h.getAliases(year, func(a *Alias) bool { return a.IsHoliday })
 }
 
+func GetSolarTerm(name string, year int) (*Result, error) {
+	return defaultHandler.GetSolarTerm(name, year)
+}
+
+func (h *Handler) GetSolarTerm(name string, year int) (*Result, error) {
+	rs, err := h.getSolarTerms(year, func(r *Result) bool { return r.SolarTerm == name })
+	if err != nil {
+		return nil, err
+	}
+
+	if len(rs) == 0 {
+		return nil, ErrNotFound
+	}
+
+	return rs[0], nil
+}
+
+func GetSolarTerms(year int) ([]*Result, error) {
+	return defaultHandler.GetSolarTerms(year)
+}
+
+func (h *Handler) GetSolarTerms(year int) ([]*Result, error) {
+	return h.getSolarTerms(year, nil)
+}
+
+func (h *Handler) getSolarTerms(year int, filterFunc func(*Result) bool) ([]*Result, error) {
+	ce := h.cacheEnabled
+	defer func() { h.cacheEnabled = ce }()
+	h.cacheEnabled = true
+
+	var results []*Result
+	for _, y := range []int{year, year + 1} {
+		_, err := h.DateToLunarDate(NewDate(y, 1, 1))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, r := range h.cacheMap[y].lunarDateCache {
+			if r.SolarTerm != "" && r.LunarDate.Year == year {
+				if filterFunc == nil || filterFunc(r) {
+					results = append(results, r)
+				}
+			}
+		}
+	}
+
+	return results, nil
+}
+
 func GetAlias(name string, year int) (*Result, error) {
 	return defaultHandler.GetAlias(name, year)
 }

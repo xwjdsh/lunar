@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"os"
 	"sort"
@@ -30,7 +31,7 @@ func main() {
 			&cli.IntFlag{
 				Name:    "year",
 				Aliases: []string{"y"},
-				Value:   0,
+				Value:   time.Now().In(CST).Year(),
 				Usage:   "target year",
 			},
 		},
@@ -41,13 +42,13 @@ func main() {
 				Usage:   "show holidays date info",
 				Action: func(c *cli.Context) error {
 					var results []*lunar.Result
-					d := currentDate(c.Int("year"))
+					d := currentDate(c)
 					results, err := lunar.Holidays(d.Year)
 					if err != nil {
 						return err
 					}
 
-					outputResults(results, c.String("format"))
+					outputResults(results, c)
 					return nil
 				},
 			},
@@ -57,13 +58,13 @@ func main() {
 				Usage:   "show aliases date info",
 				Action: func(c *cli.Context) error {
 					var results []*lunar.Result
-					d := currentDate(c.Int("year"))
+					d := currentDate(c)
 					results, err := lunar.GetAliases(d.Year)
 					if err != nil {
 						return err
 					}
 
-					outputResults(results, c.String("format"))
+					outputResults(results, c)
 					return nil
 				},
 			},
@@ -72,13 +73,16 @@ func main() {
 				Aliases: []string{"a"},
 				Usage:   "show alias date info",
 				Action: func(c *cli.Context) error {
-					d := currentDate(c.Int("year"))
+					if c.Args().Len() < 1 {
+						return errors.New("alias name is required")
+					}
+					d := currentDate(c)
 					r, err := lunar.GetAlias(c.Args().First(), d.Year)
 					if err != nil {
 						return err
 					}
 
-					outputResults([]*lunar.Result{r}, c.String("format"))
+					outputResults([]*lunar.Result{r}, c)
 					return nil
 				},
 			},
@@ -88,6 +92,39 @@ func main() {
 				Usage:   "reverse mode, query date by lunar date",
 				Action: func(c *cli.Context) error {
 					return queryAndDisplay(c, true)
+				},
+			},
+			{
+				Name:    "solar-terms",
+				Aliases: []string{"sts"},
+				Usage:   "24 solar terms",
+				Action: func(c *cli.Context) error {
+					d := currentDate(c)
+					rs, err := lunar.GetSolarTerms(d.Year)
+					if err != nil {
+						return err
+					}
+
+					outputResults(rs, c)
+					return nil
+				},
+			},
+			{
+				Name:    "solar-term",
+				Aliases: []string{"st"},
+				Usage:   "get solar term info by name",
+				Action: func(c *cli.Context) error {
+					if c.Args().Len() < 1 {
+						return errors.New("solar term name is required")
+					}
+					d := currentDate(c)
+					r, err := lunar.GetSolarTerm(c.Args().First(), d.Year)
+					if err != nil {
+						return err
+					}
+
+					outputResults([]*lunar.Result{r}, c)
+					return nil
 				},
 			},
 		},
@@ -102,7 +139,8 @@ func main() {
 	}
 }
 
-func outputResults(rs []*lunar.Result, dateFormat string) {
+func outputResults(rs []*lunar.Result, c *cli.Context) {
+	dateFormat := c.String("format")
 	sort.Slice(rs, func(i, j int) bool {
 		di, dj := rs[i].Date, rs[j].Date
 		if di.Year != dj.Year {
@@ -161,17 +199,15 @@ func getLunarResult(d lunar.Date, reverse bool) (*lunar.Result, lunar.Date, erro
 	return result, resultDate, err
 }
 
-func currentDate(year int) lunar.Date {
+func currentDate(c *cli.Context) lunar.Date {
 	d := lunar.DateByTime(time.Now().In(CST))
-	if year != 0 {
-		d.Year = year
-	}
+	d.Year = c.Int("year")
 
 	return d
 }
 
 func queryAndDisplay(c *cli.Context, reverse bool) error {
-	d := currentDate(c.Int("year"))
+	d := currentDate(c)
 	if s := c.Args().First(); s != "" {
 		t, err := time.Parse("0102", s)
 		if err != nil {
@@ -184,6 +220,6 @@ func queryAndDisplay(c *cli.Context, reverse bool) error {
 	if err != nil {
 		return err
 	}
-	outputResults([]*lunar.Result{result}, c.String("format"))
+	outputResults([]*lunar.Result{result}, c)
 	return nil
 }
