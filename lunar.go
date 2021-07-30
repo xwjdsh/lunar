@@ -146,23 +146,13 @@ type fileCache struct {
 }
 
 type Handler struct {
-	cacheEnabled bool
-	cacheMap     map[int]*fileCache
+	cacheMap map[int]*fileCache
 }
 
 func New() *Handler {
 	return &Handler{
 		cacheMap: map[int]*fileCache{},
 	}
-}
-
-func Cache(enabled bool) {
-	defaultHandler.Cache(enabled)
-}
-
-func (h *Handler) Cache(enabled bool) *Handler {
-	h.cacheEnabled = enabled
-	return h
 }
 
 func Holidays(year int) ([]*Result, error) {
@@ -199,10 +189,6 @@ func (h *Handler) GetSolarTerms(year int) ([]*Result, error) {
 }
 
 func (h *Handler) getSolarTerms(year int, filterFunc func(*Result) bool) ([]*Result, error) {
-	ce := h.cacheEnabled
-	defer func() { h.cacheEnabled = ce }()
-	h.cacheEnabled = true
-
 	var results []*Result
 	for _, y := range []int{year, year + 1} {
 		_, err := h.DateToLunarDate(NewDate(y, 1, 1))
@@ -275,11 +261,9 @@ func DateToLunarDate(d Date) (*Result, error) {
 }
 
 func (h *Handler) DateToLunarDate(d Date) (*Result, error) {
-	if h.cacheEnabled {
-		_, r := h.queryCache(d.Year, d, true)
-		if r != nil {
-			return r, nil
-		}
+	loaded, r := h.queryCache(d.Year, d, true)
+	if loaded && r != nil {
+		return r, nil
 	}
 
 	f, err := loadFileFunc(fmt.Sprintf("T%dc.txt", d.Year))
@@ -299,12 +283,9 @@ func LunarDateToDate(d Date) (*Result, error) {
 func (h *Handler) LunarDateToDate(d Date) (*Result, error) {
 	fileLoaded := false
 	var r *Result
-	if h.cacheEnabled {
-		fileLoaded, r = h.queryCache(d.Year, d, false)
-		if r != nil {
-			return r, nil
-		}
-
+	fileLoaded, r = h.queryCache(d.Year, d, false)
+	if fileLoaded && r != nil {
+		return r, nil
 	}
 
 	lunarMonth := 0
@@ -324,12 +305,11 @@ func (h *Handler) LunarDateToDate(d Date) (*Result, error) {
 		}
 	}
 
-	if h.cacheEnabled {
-		fileLoaded, r = h.queryCache(d.Year+1, d, false)
-		if r != nil {
-			return r, nil
-		}
+	fileLoaded, r = h.queryCache(d.Year+1, d, false)
+	if fileLoaded && r != nil {
+		return r, nil
 	}
+
 	if !fileLoaded {
 		f1, err := loadFileFunc(fmt.Sprintf("T%dc.txt", d.Year+1))
 		if err != nil {
@@ -388,9 +368,6 @@ func (h *Handler) find(rd io.Reader, d Date, dateToLunarDate bool, fileYear, lun
 		}
 
 		unknownMonthResults = newunknownMonthResults
-		if result != nil && result.LunarDate.Valid() && !h.cacheEnabled {
-			return result, nil
-		}
 	}
 
 	if result == nil || !result.LunarDate.Valid() {
@@ -489,19 +466,18 @@ func (h *Handler) cache(r *Result, fileYear int) {
 	if a, ok := dateToAliasMap[dateWithLunar{Date: d, isLunar: true}]; ok {
 		r.Aliases = append(r.Aliases, *a)
 	}
-	if h.cacheEnabled {
-		c, ok := h.cacheMap[fileYear]
-		if !ok {
-			c = &fileCache{
-				dateCache:      map[Date]*Result{},
-				lunarDateCache: map[Date]*Result{},
-			}
-			h.cacheMap[fileYear] = c
-		}
 
-		c.dateCache[r.Date] = r
-		c.lunarDateCache[r.LunarDate] = r
+	c, ok := h.cacheMap[fileYear]
+	if !ok {
+		c = &fileCache{
+			dateCache:      map[Date]*Result{},
+			lunarDateCache: map[Date]*Result{},
+		}
+		h.cacheMap[fileYear] = c
 	}
+
+	c.dateCache[r.Date] = r
+	c.lunarDateCache[r.LunarDate] = r
 }
 
 func (h *Handler) queryCache(fileYear int, d Date, dateToLunarDate bool) (bool, *Result) {

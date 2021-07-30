@@ -17,7 +17,6 @@ import (
 var CST = time.FixedZone("CST", 3600*8)
 
 func main() {
-	lunar.Cache(true)
 	app := &cli.App{
 		Name:  "lunar",
 		Usage: "lunar is a command line tool for conversion between Gregorian calendar and lunar calendar.(1901~2100)",

@@ -14,10 +14,6 @@ var m = map[Date]Date{
 
 func TestDateToLunarDate(t *testing.T) {
 	for i := 0; i <= 1; i++ {
-		if i == 1 {
-			Cache(true)
-		}
-
 		for k, v := range m {
 			d, err := DateToLunarDate(k)
 			if err != nil {
@@ -43,20 +39,6 @@ func BenchmarkDateToLunarDate(b *testing.B) {
 	}
 }
 
-func BenchmarkDateToLunarDateCache(b *testing.B) {
-	h := New()
-	h.Cache(true)
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		for k, v := range m {
-			r, _ := h.DateToLunarDate(k)
-			if r.LunarDate != v {
-				b.FailNow()
-			}
-		}
-	}
-}
-
 func TestLunarDateToDate(t *testing.T) {
 	for k, v := range m {
 		d, err := LunarDateToDate(v)
@@ -71,20 +53,6 @@ func TestLunarDateToDate(t *testing.T) {
 
 func BenchmarkLunarDateToDate(b *testing.B) {
 	h := New()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		for k, v := range m {
-			r, _ := h.LunarDateToDate(v)
-			if r.Date != k {
-				b.FailNow()
-			}
-		}
-	}
-}
-
-func BenchmarkLunarDateToDateCache(b *testing.B) {
-	h := New()
-	h.Cache(true)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for k, v := range m {
