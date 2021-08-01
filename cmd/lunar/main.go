@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"log"
 	"os"
 	"sort"
@@ -52,36 +51,29 @@ func main() {
 				},
 			},
 			{
-				Name:    "aliases",
-				Aliases: []string{"as"},
-				Usage:   "show aliases date info",
+				Name:    "alias",
+				Aliases: []string{"a"},
+				Usage:   "show alias date info",
 				Action: func(c *cli.Context) error {
-					var results []*lunar.Result
 					d := currentDate(c)
-					results, err := lunar.GetAliases(d.Year)
+					var (
+						results []*lunar.Result
+						err     error
+					)
+					if c.Args().Len() >= 1 {
+						var r *lunar.Result
+						r, err = lunar.GetAlias(c.Args().First(), d.Year)
+						if err == nil {
+							results = append(results, r)
+						}
+					} else {
+						results, err = lunar.GetAliases(d.Year)
+					}
 					if err != nil {
 						return err
 					}
 
 					outputResults(results, c)
-					return nil
-				},
-			},
-			{
-				Name:    "alias",
-				Aliases: []string{"a"},
-				Usage:   "show alias date info",
-				Action: func(c *cli.Context) error {
-					if c.Args().Len() < 1 {
-						return errors.New("alias name is required")
-					}
-					d := currentDate(c)
-					r, err := lunar.GetAlias(c.Args().First(), d.Year)
-					if err != nil {
-						return err
-					}
-
-					outputResults([]*lunar.Result{r}, c)
 					return nil
 				},
 			},
@@ -94,35 +86,29 @@ func main() {
 				},
 			},
 			{
-				Name:    "solar-terms",
-				Aliases: []string{"sts"},
-				Usage:   "24 solar terms",
+				Name:    "solar-term",
+				Aliases: []string{"st"},
+				Usage:   "get solar term info by name",
 				Action: func(c *cli.Context) error {
 					d := currentDate(c)
-					rs, err := lunar.GetSolarTerms(d.Year)
+					var (
+						rs  []*lunar.Result
+						err error
+					)
+					if c.Args().Len() >= 1 {
+						var r *lunar.Result
+						r, err = lunar.GetSolarTerm(c.Args().First(), d.Year)
+						if err == nil {
+							rs = append(rs, r)
+						}
+					} else {
+						rs, err = lunar.GetSolarTerms(d.Year)
+					}
 					if err != nil {
 						return err
 					}
 
 					outputResults(rs, c)
-					return nil
-				},
-			},
-			{
-				Name:    "solar-term",
-				Aliases: []string{"st"},
-				Usage:   "get solar term info by name",
-				Action: func(c *cli.Context) error {
-					if c.Args().Len() < 1 {
-						return errors.New("solar term name is required")
-					}
-					d := currentDate(c)
-					r, err := lunar.GetSolarTerm(c.Args().First(), d.Year)
-					if err != nil {
-						return err
-					}
-
-					outputResults([]*lunar.Result{r}, c)
 					return nil
 				},
 			},
