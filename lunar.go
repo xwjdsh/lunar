@@ -23,32 +23,35 @@ type Alias struct {
 	Name        string
 	Date        Date
 	IsLunarDate bool
-	IsHoliday   bool
+	Tags        []string
 }
 
-func NewAlias(name string, d Date, isLunarDate, isHoliday bool) *Alias {
+func NewAlias(name string, d Date, isLunarDate bool, tags ...string) *Alias {
 	return &Alias{
 		Name:        name,
 		Date:        d,
 		IsLunarDate: isLunarDate,
-		IsHoliday:   isHoliday,
+		Tags:        tags,
 	}
 }
 
+const holidayTag = "holiday"
+
+var holidayTags = []string{holidayTag}
 var commonAliases = []*Alias{
-	NewAlias("春节", NewDate(0, 1, 1), true, true),
-	NewAlias("元旦", NewDate(0, 1, 1), false, true),
-	NewAlias("元宵", NewDate(0, 1, 15), true, false),
-	NewAlias("清明", NewDate(0, 4, 4), false, true),
-	NewAlias("劳动", NewDate(0, 5, 1), false, true),
-	NewAlias("端午", NewDate(0, 5, 5), true, true),
-	NewAlias("七夕", NewDate(0, 7, 7), true, false),
-	NewAlias("中元", NewDate(0, 7, 15), true, false),
-	NewAlias("中秋", NewDate(0, 8, 15), true, true),
-	NewAlias("重阳", NewDate(0, 9, 9), true, false),
-	NewAlias("国庆", NewDate(0, 10, 1), false, true),
-	NewAlias("下元", NewDate(0, 10, 15), true, false),
-	NewAlias("腊八", NewDate(0, 12, 8), true, false),
+	NewAlias("春节", NewDate(0, 1, 1), true, holidayTag),
+	NewAlias("元旦", NewDate(0, 1, 1), false, holidayTag),
+	NewAlias("元宵", NewDate(0, 1, 15), true),
+	NewAlias("清明", NewDate(0, 4, 4), false, holidayTag),
+	NewAlias("劳动", NewDate(0, 5, 1), false, holidayTag),
+	NewAlias("端午", NewDate(0, 5, 5), true, holidayTag),
+	NewAlias("七夕", NewDate(0, 7, 7), true),
+	NewAlias("中元", NewDate(0, 7, 15), true),
+	NewAlias("中秋", NewDate(0, 8, 15), true, holidayTag),
+	NewAlias("重阳", NewDate(0, 9, 9), true),
+	NewAlias("国庆", NewDate(0, 10, 1), false, holidayTag),
+	NewAlias("下元", NewDate(0, 10, 15), true),
+	NewAlias("腊八", NewDate(0, 12, 8), true),
 }
 
 var (
@@ -160,7 +163,14 @@ func Holidays(year int) ([]*Result, error) {
 }
 
 func (h *Handler) Holidays(year int) ([]*Result, error) {
-	return h.getAliases(year, func(a *Alias) bool { return a.IsHoliday })
+	return h.getAliases(year, func(a *Alias) bool {
+		for _, t := range a.Tags {
+			if t == holidayTag {
+				return true
+			}
+		}
+		return false
+	})
 }
 
 func GetSolarTerm(name string, year int) (*Result, error) {
