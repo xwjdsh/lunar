@@ -53,7 +53,14 @@ func main() {
 			{
 				Name:    "alias",
 				Aliases: []string{"a"},
-				Usage:   "show alias date info",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:    "tag",
+						Aliases: []string{"t"},
+						Usage:   "query by tag",
+					},
+				},
+				Usage: "show alias date info",
 				Action: func(c *cli.Context) error {
 					d := currentDate(c)
 					var (
@@ -61,11 +68,7 @@ func main() {
 						err     error
 					)
 					if c.Args().Len() >= 1 {
-						var r *lunar.Result
-						r, err = lunar.GetAlias(c.Args().First(), d.Year)
-						if err == nil {
-							results = append(results, r)
-						}
+						results, err = lunar.GetAliases(d.Year, c.Args().Slice()...)
 					} else {
 						results, err = lunar.GetAliases(d.Year)
 					}

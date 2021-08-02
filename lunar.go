@@ -218,25 +218,23 @@ func (h *Handler) getSolarTerms(year int, filterFunc func(*Result) bool) ([]*Res
 	return results, nil
 }
 
-func GetAlias(name string, year int) (*Result, error) {
-	return defaultHandler.GetAlias(name, year)
+func GetAliases(year int, names ...string) ([]*Result, error) {
+	return defaultHandler.GetAliases(year, names...)
 }
 
-func (h *Handler) GetAlias(name string, year int) (*Result, error) {
-	a, ok := aliasMap[name]
-	if !ok {
-		return nil, fmt.Errorf("lunar: alias %s not found", name)
+func (h *Handler) GetAliases(year int, names ...string) ([]*Result, error) {
+	if len(names) == 0 {
+		return h.getAliases(year, nil)
 	}
 
-	return h.getAliasResult(a, year)
-}
+	nameMap := map[string]bool{}
+	for _, name := range names {
+		nameMap[name] = true
+	}
 
-func GetAliases(year int) ([]*Result, error) {
-	return defaultHandler.GetAliases(year)
-}
-
-func (h *Handler) GetAliases(year int) ([]*Result, error) {
-	return h.getAliases(year, nil)
+	return h.getAliases(year, func(a *Alias) bool {
+		return nameMap[a.Name]
+	})
 }
 
 func (h *Handler) getAliases(year int, filterFunc func(*Alias) bool) ([]*Result, error) {
