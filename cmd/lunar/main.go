@@ -24,13 +24,18 @@ func main() {
 				Name:    "format",
 				Aliases: []string{"f"},
 				Value:   "2006-01-02",
-				Usage:   "output date format",
+				Usage:   "Output date format",
 			},
 			&cli.IntFlag{
 				Name:    "year",
 				Aliases: []string{"y"},
 				Value:   time.Now().In(CST).Year(),
-				Usage:   "target year",
+				Usage:   "Target year",
+			},
+			&cli.BoolFlag{
+				Name:    "reverse",
+				Aliases: []string{"r"},
+				Usage:   "Reverse mode, query date by lunar date",
 			},
 		},
 		Commands: []*cli.Command{
@@ -44,7 +49,7 @@ func main() {
 						Usage:   "query by tag",
 					},
 				},
-				Usage: "show alias date info",
+				Usage: "Show alias date info",
 				Action: func(c *cli.Context) error {
 					d := currentDate(c)
 					var (
@@ -69,17 +74,9 @@ func main() {
 				},
 			},
 			{
-				Name:    "reverse",
-				Aliases: []string{"r"},
-				Usage:   "reverse mode, query date by lunar date",
-				Action: func(c *cli.Context) error {
-					return queryAndDisplay(c, true)
-				},
-			},
-			{
 				Name:    "solar-term",
 				Aliases: []string{"st"},
-				Usage:   "get solar term info by name",
+				Usage:   "Get solar term info",
 				Action: func(c *cli.Context) error {
 					d := currentDate(c)
 					var (
@@ -105,7 +102,7 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			return queryAndDisplay(c, false)
+			return queryAndDisplay(c, c.Bool("reverse"))
 		},
 	}
 
