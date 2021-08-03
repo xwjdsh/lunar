@@ -35,22 +35,6 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			{
-				Name:    "holidays",
-				Aliases: []string{"h"},
-				Usage:   "show holidays date info",
-				Action: func(c *cli.Context) error {
-					var results []*lunar.Result
-					d := currentDate(c)
-					results, err := lunar.Holidays(d.Year)
-					if err != nil {
-						return err
-					}
-
-					outputResults(results, c)
-					return nil
-				},
-			},
-			{
 				Name:    "alias",
 				Aliases: []string{"a"},
 				Flags: []cli.Flag{
@@ -67,10 +51,14 @@ func main() {
 						results []*lunar.Result
 						err     error
 					)
-					if c.Args().Len() >= 1 {
-						results, err = lunar.GetAliases(d.Year, c.Args().Slice()...)
+					if tag := c.String("tag"); tag != "" {
+						results, err = lunar.GetAliasesByTag(d.Year, tag)
 					} else {
-						results, err = lunar.GetAliases(d.Year)
+						if c.Args().Len() >= 1 {
+							results, err = lunar.GetAliases(d.Year, c.Args().Slice()...)
+						} else {
+							results, err = lunar.GetAliases(d.Year)
+						}
 					}
 					if err != nil {
 						return err
@@ -151,15 +139,24 @@ func outputResults(rs []*lunar.Result, c *cli.Context) {
 		}
 
 		aliases := []string{}
+		tagMap := map[string]bool{}
+		tags := []string{}
 		for _, a := range r.Aliases {
 			aliases = append(aliases, a.Name)
+			for _, t := range a.Tags {
+				if !tagMap[t] {
+					tagMap[t] = true
+					tags = append(tags, t)
+				}
+			}
 		}
 		row = append(row, strings.Join(aliases, ","))
+		row = append(row, strings.Join(tags, ","))
 		data[i] = row
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	header := []string{"公历", "农历", "星期", "节气", "别名"}
+	header := []string{"公历", "农历", "星期", "节气", "别名", "标签"}
 	table.SetHeader(header)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.AppendBulk(data)

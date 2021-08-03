@@ -218,6 +218,21 @@ func (h *Handler) getSolarTerms(year int, filterFunc func(*Result) bool) ([]*Res
 	return results, nil
 }
 
+func GetAliasesByTag(year int, tag string) ([]*Result, error) {
+	return defaultHandler.GetAliasesByTag(year, tag)
+}
+
+func (h *Handler) GetAliasesByTag(year int, tag string) ([]*Result, error) {
+	return h.getAliases(year, func(a *Alias) bool {
+		for _, t := range a.Tags {
+			if t == tag {
+				return true
+			}
+		}
+		return false
+	})
+}
+
 func GetAliases(year int, names ...string) ([]*Result, error) {
 	return defaultHandler.GetAliases(year, names...)
 }
