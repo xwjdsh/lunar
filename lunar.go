@@ -173,29 +173,22 @@ func (h *Handler) Holidays(year int) ([]*Result, error) {
 	})
 }
 
-func GetSolarTerm(name string, year int) (*Result, error) {
-	return defaultHandler.GetSolarTerm(name, year)
+func GetSolarTerms(year int, names ...string) ([]*Result, error) {
+	return defaultHandler.GetSolarTerms(year, names...)
 }
 
-func (h *Handler) GetSolarTerm(name string, year int) (*Result, error) {
-	rs, err := h.getSolarTerms(year, func(r *Result) bool { return r.SolarTerm == name })
-	if err != nil {
-		return nil, err
+func (h *Handler) GetSolarTerms(year int, names ...string) ([]*Result, error) {
+	if len(names) == 0 {
+		return h.getSolarTerms(year, nil)
+	}
+	nameMap := map[string]bool{}
+	for _, name := range names {
+		nameMap[name] = true
 	}
 
-	if len(rs) == 0 {
-		return nil, ErrNotFound
-	}
-
-	return rs[0], nil
-}
-
-func GetSolarTerms(year int) ([]*Result, error) {
-	return defaultHandler.GetSolarTerms(year)
-}
-
-func (h *Handler) GetSolarTerms(year int) ([]*Result, error) {
-	return h.getSolarTerms(year, nil)
+	return h.getSolarTerms(year, func(r *Result) bool {
+		return nameMap[r.SolarTerm]
+	})
 }
 
 func (h *Handler) getSolarTerms(year int, filterFunc func(*Result) bool) ([]*Result, error) {

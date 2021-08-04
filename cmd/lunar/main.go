@@ -84,11 +84,7 @@ func main() {
 						err error
 					)
 					if c.Args().Len() >= 1 {
-						var r *lunar.Result
-						r, err = lunar.GetSolarTerm(c.Args().First(), d.Year)
-						if err == nil {
-							rs = append(rs, r)
-						}
+						rs, err = lunar.GetSolarTerms(d.Year, c.Args().Slice()...)
 					} else {
 						rs, err = lunar.GetSolarTerms(d.Year)
 					}
