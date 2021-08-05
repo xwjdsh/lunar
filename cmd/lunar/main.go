@@ -11,11 +11,13 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/xwjdsh/lunar"
+	"github.com/xwjdsh/lunar/alias"
 )
 
 var CST = time.FixedZone("CST", 3600*8)
 
 func main() {
+	h := alias.NewHandler(lunar.New())
 	app := &cli.App{
 		Name:  "lunar",
 		Usage: "lunar is a command line tool for conversion between Gregorian calendar and lunar calendar.(1901~2100)",
@@ -53,16 +55,16 @@ func main() {
 				Action: func(c *cli.Context) error {
 					d := currentDate(c)
 					var (
-						results []*lunar.Result
+						results []*alias.Result
 						err     error
 					)
 					if tag := c.String("tag"); tag != "" {
-						results, err = lunar.GetAliasesByTag(d.Year, tag)
+						results, err = h.GetAliasesByTag(d.Year, tag)
 					} else {
 						if c.Args().Len() >= 1 {
-							results, err = lunar.GetAliases(d.Year, c.Args().Slice()...)
+							results, err = h.GetAliases(d.Year, c.Args().Slice()...)
 						} else {
-							results, err = lunar.GetAliases(d.Year)
+							results, err = h.GetAliases(d.Year)
 						}
 					}
 					if err != nil {
@@ -80,13 +82,13 @@ func main() {
 				Action: func(c *cli.Context) error {
 					d := currentDate(c)
 					var (
-						rs  []*lunar.Result
+						rs  []*alias.Result
 						err error
 					)
 					if c.Args().Len() >= 1 {
-						rs, err = lunar.GetSolarTerms(d.Year, c.Args().Slice()...)
+						rs, err = alias.WrapResults(h.GetSolarTerms(d.Year, c.Args().Slice()...))
 					} else {
-						rs, err = lunar.GetSolarTerms(d.Year)
+						rs, err = alias.WrapResults(h.GetSolarTerms(d.Year))
 					}
 					if err != nil {
 						return err
@@ -98,7 +100,21 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			return queryAndDisplay(c, c.Bool("reverse"))
+			d := currentDate(c)
+			if s := c.Args().First(); s != "" {
+				t, err := time.Parse("0102", s)
+				if err != nil {
+					return err
+				}
+				d.Month, d.Day = int(t.Month()), t.Day()
+			}
+
+			result, err := alias.WrapResult(getLunarResult(d, c.Bool("reverse")))
+			if err != nil {
+				return err
+			}
+			outputResults([]*alias.Result{result}, c)
+			return nil
 		},
 	}
 
@@ -108,7 +124,7 @@ func main() {
 	}
 }
 
-func outputResults(rs []*lunar.Result, c *cli.Context) {
+func outputResults(rs []*alias.Result, c *cli.Context) {
 	dateFormat := c.String("format")
 	sort.Slice(rs, func(i, j int) bool {
 		di, dj := rs[i].Date, rs[j].Date
@@ -156,25 +172,18 @@ func outputResults(rs []*lunar.Result, c *cli.Context) {
 	table.Render()
 }
 
-func getLunarResult(d lunar.Date, reverse bool) (*lunar.Result, lunar.Date, error) {
+func getLunarResult(d lunar.Date, reverse bool) (*lunar.Result, error) {
 	var (
-		result     *lunar.Result
-		err        error
-		resultDate lunar.Date
+		result *lunar.Result
+		err    error
 	)
 	if reverse {
 		result, err = lunar.LunarDateToDate(d)
-		if err == nil {
-			resultDate = result.Date
-		}
 	} else {
 		result, err = lunar.DateToLunarDate(d)
-		if err == nil {
-			resultDate = result.LunarDate
-		}
 	}
 
-	return result, resultDate, err
+	return result, err
 }
 
 func currentDate(c *cli.Context) lunar.Date {
@@ -182,22 +191,4 @@ func currentDate(c *cli.Context) lunar.Date {
 	d.Year = c.Int("year")
 
 	return d
-}
-
-func queryAndDisplay(c *cli.Context, reverse bool) error {
-	d := currentDate(c)
-	if s := c.Args().First(); s != "" {
-		t, err := time.Parse("0102", s)
-		if err != nil {
-			return err
-		}
-		d.Month, d.Day = int(t.Month()), t.Day()
-	}
-
-	result, _, err := getLunarResult(d, reverse)
-	if err != nil {
-		return err
-	}
-	outputResults([]*lunar.Result{result}, c)
-	return nil
 }
