@@ -3,10 +3,11 @@ package alias
 import "github.com/xwjdsh/lunar"
 
 type Alias struct {
-	Name        string
-	Date        lunar.Date
-	IsLunarDate bool
-	Tags        []string
+	Name        string     `json:"name"`
+	Disable     bool       `json:"disable"`
+	Date        lunar.Date `json:"date"`
+	IsLunarDate bool       `json:"is_lunar_date"`
+	Tags        []string   `json:"tags"`
 }
 
 func New(name string, d lunar.Date, isLunarDate bool, tags ...string) *Alias {
@@ -37,21 +38,9 @@ var commonAliases = []*Alias{
 	New("腊八", lunar.NewDate(0, 12, 8), true),
 }
 
-var (
-	aliasMap       = map[string]*Alias{}
-	dateToAliasMap = map[dateWithLunar]*Alias{}
-)
-
 type dateWithLunar struct {
 	isLunar bool
 	lunar.Date
-}
-
-func init() {
-	for _, a := range commonAliases {
-		aliasMap[a.Name] = a
-		dateToAliasMap[dateWithLunar{Date: a.Date, isLunar: a.IsLunarDate}] = a
-	}
 }
 
 type Result struct {
@@ -61,11 +50,29 @@ type Result struct {
 
 type Handler struct {
 	*lunar.Handler
+	aliasMap       map[string]*Alias
+	dateToAliasMap map[dateWithLunar][]*Alias
 }
 
 func NewHandler(h *lunar.Handler) *Handler {
-	return &Handler{
-		Handler: h,
+	handler := &Handler{
+		Handler:        h,
+		aliasMap:       map[string]*Alias{},
+		dateToAliasMap: map[dateWithLunar][]*Alias{},
+	}
+	for _, a := range commonAliases {
+		handler.aliasMap[a.Name] = a
+	}
+
+	handler.refreshDateMap()
+	return handler
+}
+
+func (h *Handler) refreshDateMap() {
+	h.dateToAliasMap = map[dateWithLunar][]*Alias{}
+	for _, a := range h.aliasMap {
+		dl := dateWithLunar{Date: a.Date, isLunar: a.IsLunarDate}
+		h.dateToAliasMap[dl] = append(h.dateToAliasMap[dl], a)
 	}
 }
 
@@ -101,7 +108,7 @@ func (h *Handler) getAliases(year int, filterFunc func(*Alias) bool) ([]*Result,
 		dm = map[lunar.Date]bool{}
 	)
 
-	for _, a := range commonAliases {
+	for _, a := range h.aliasMap {
 		if filterFunc != nil && !filterFunc(a) {
 			continue
 		}
@@ -126,7 +133,7 @@ func (h *Handler) getAliasResult(a *Alias, year int) (*Result, error) {
 	d := a.Date
 	if !a.IsLunarDate {
 		d.Year = year
-		return WrapResult(h.DateToLunarDate(d))
+		return h.WrapResult(h.DateToLunarDate(d))
 	}
 
 	for _, y := range []int{year, year - 1} {
@@ -136,45 +143,62 @@ func (h *Handler) getAliasResult(a *Alias, year int) (*Result, error) {
 			return nil, err
 		}
 		if r.Date.Year == year {
-			return resultWithAliases(r), nil
+			return h.resultWithAliases(r), nil
 		}
 	}
 
 	return nil, lunar.ErrNotFound
 }
 
-func WrapResults(rs []*lunar.Result, err error) ([]*Result, error) {
+func (h *Handler) WrapResults(rs []*lunar.Result, err error) ([]*Result, error) {
 	if err != nil {
 		return nil, err
 	}
 
 	var nrs []*Result
 	for _, r := range rs {
-		nrs = append(nrs, resultWithAliases(r))
+		nrs = append(nrs, h.resultWithAliases(r))
 	}
 
 	return nrs, nil
 }
 
-func WrapResult(r *lunar.Result, err error) (*Result, error) {
+func (h *Handler) WrapResult(r *lunar.Result, err error) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
 
-	return resultWithAliases(r), nil
+	return h.resultWithAliases(r), nil
 }
 
-func resultWithAliases(r *lunar.Result) *Result {
+func (h *Handler) resultWithAliases(r *lunar.Result) *Result {
 	d := lunar.NewDate(0, r.Date.Month, r.Date.Day)
 	nr := &Result{Result: r}
-	if a, ok := dateToAliasMap[dateWithLunar{Date: d, isLunar: false}]; ok {
-		nr.Aliases = append(nr.Aliases, *a)
+	if as, ok := h.dateToAliasMap[dateWithLunar{Date: d, isLunar: false}]; ok {
+		for _, a := range as {
+			nr.Aliases = append(nr.Aliases, *a)
+		}
 	}
 
 	d = lunar.NewDate(0, r.LunarDate.Month, r.LunarDate.Day)
-	if a, ok := dateToAliasMap[dateWithLunar{Date: d, isLunar: true}]; ok {
-		nr.Aliases = append(nr.Aliases, *a)
+	if as, ok := h.dateToAliasMap[dateWithLunar{Date: d, isLunar: true}]; ok {
+		for _, a := range as {
+			nr.Aliases = append(nr.Aliases, *a)
+		}
 	}
 
 	return nr
+}
+
+func (h *Handler) LoadCustomAlias(as []*Alias) error {
+	for _, a := range as {
+		if a.Disable {
+			delete(h.aliasMap, a.Name)
+		} else {
+			h.aliasMap[a.Name] = a
+		}
+	}
+
+	h.refreshDateMap()
+	return nil
 }

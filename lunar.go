@@ -29,9 +29,9 @@ type Result struct {
 }
 
 type Date struct {
-	Year  int
-	Month int
-	Day   int
+	Year  int `json:"year"`
+	Month int `json:"month"`
+	Day   int `json:"day"`
 }
 
 func NewDate(y, m, d int) Date {

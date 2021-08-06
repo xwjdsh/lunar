@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -16,6 +19,10 @@ import (
 
 var CST = time.FixedZone("CST", 3600*8)
 
+type Config struct {
+	Aliases []*alias.Alias `json:"aliases"`
+}
+
 func main() {
 	h := alias.NewHandler(lunar.New())
 	app := &cli.App{
@@ -28,6 +35,12 @@ func main() {
 				Value:   "2006-01-02",
 				Usage:   "Output date format",
 			},
+			&cli.StringFlag{
+				Name:    "config",
+				Aliases: []string{"c"},
+				Value:   path.Join(mustUserHomeDir(), ".config/lunar/lunar.json"),
+				Usage:   "Custom config path",
+			},
 			&cli.IntFlag{
 				Name:    "year",
 				Aliases: []string{"y"},
@@ -39,6 +52,21 @@ func main() {
 				Aliases: []string{"r"},
 				Usage:   "Reverse mode, query date by lunar date",
 			},
+		},
+		Before: func(c *cli.Context) error {
+			fp := c.String("config")
+			data, err := ioutil.ReadFile(fp)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil
+				}
+				return err
+			}
+			conf := &Config{}
+			if err := json.Unmarshal(data, conf); err != nil {
+				return err
+			}
+			return h.LoadCustomAlias(conf.Aliases)
 		},
 		Commands: []*cli.Command{
 			{
@@ -86,9 +114,9 @@ func main() {
 						err error
 					)
 					if c.Args().Len() >= 1 {
-						rs, err = alias.WrapResults(h.GetSolarTerms(d.Year, c.Args().Slice()...))
+						rs, err = h.WrapResults(h.GetSolarTerms(d.Year, c.Args().Slice()...))
 					} else {
-						rs, err = alias.WrapResults(h.GetSolarTerms(d.Year))
+						rs, err = h.WrapResults(h.GetSolarTerms(d.Year))
 					}
 					if err != nil {
 						return err
@@ -109,7 +137,7 @@ func main() {
 				d.Month, d.Day = int(t.Month()), t.Day()
 			}
 
-			result, err := alias.WrapResult(getLunarResult(d, c.Bool("reverse")))
+			result, err := h.WrapResult(getLunarResult(d, c.Bool("reverse")))
 			if err != nil {
 				return err
 			}
@@ -190,5 +218,13 @@ func currentDate(c *cli.Context) lunar.Date {
 	d := lunar.DateByTime(time.Now().In(CST))
 	d.Year = c.Int("year")
 
+	return d
+}
+
+func mustUserHomeDir() string {
+	d, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal(err)
+	}
 	return d
 }
