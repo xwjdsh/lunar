@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"path"
 	"sort"
@@ -168,12 +169,24 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 	})
 
 	data := make([][]string, len(rs))
-	now := currentDate(c)
+	now := time.Now()
+
 	for i, r := range rs {
+		// calc timedelta
+		var timedeltaStr string
+		timedelta := now.Sub(r.Date.Time()).Hours() / 24
+		if timedelta < 0 {
+			timedelta = math.Abs(timedelta)
+			timedeltaStr = strings.Join([]string{"还有 ", strconv.Itoa(int(timedelta)), " 天"}, "")
+		} else {
+			timedeltaStr = strings.Join([]string{"已过去 ", strconv.Itoa(int(timedelta)), " 天"}, "")
+		}
+
 		row := []string{
 			r.Date.Time().Format(dateFormat),
 			r.LunarDate.Time().Format(dateFormat),
 			r.WeekdayRaw,
+			timedeltaStr,
 			r.SolarTerm,
 		}
 
@@ -189,21 +202,13 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 				}
 			}
 		}
-		var timedeltaStr string
-		timedelta := int(now.Time().Sub(r.Date.Time()).Hours())
-		if timedelta <= 24 && timedelta >=0 || timedelta >= -24 && timedelta <= 0 {
-			timedeltaStr = strings.Join([]string{strconv.Itoa(timedelta), " hours"}, "")
-		} else {
-			timedeltaStr = strings.Join([]string{strconv.Itoa(timedelta / 24), " days"}, "")
-		}
 		row = append(row, strings.Join(aliases, ","))
 		row = append(row, strings.Join(tags, ","))
-		row = append(row, timedeltaStr)
 		data[i] = row
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	header := []string{"公历", "农历", "星期", "节气", "别名", "标签", "距今"}
+	header := []string{"公历", "农历", "星期", "距今", "节气", "别名", "标签"}
 	table.SetHeader(header)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.AppendBulk(data)
