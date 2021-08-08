@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -167,6 +168,7 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 	})
 
 	data := make([][]string, len(rs))
+	now := currentDate(c)
 	for i, r := range rs {
 		row := []string{
 			r.Date.Time().Format(dateFormat),
@@ -187,13 +189,21 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 				}
 			}
 		}
+		var timedeltaStr string
+		timedelta := int(now.Time().Sub(r.Date.Time()).Hours())
+		if timedelta <= 24 && timedelta >=0 || timedelta >= -24 && timedelta <= 0 {
+			timedeltaStr = strings.Join([]string{strconv.Itoa(timedelta), " hours"}, "")
+		} else {
+			timedeltaStr = strings.Join([]string{strconv.Itoa(timedelta / 24), " days"}, "")
+		}
 		row = append(row, strings.Join(aliases, ","))
 		row = append(row, strings.Join(tags, ","))
+		row = append(row, timedeltaStr)
 		data[i] = row
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	header := []string{"公历", "农历", "星期", "节气", "别名", "标签"}
+	header := []string{"公历", "农历", "星期", "节气", "别名", "标签", "距今"}
 	table.SetHeader(header)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.AppendBulk(data)
