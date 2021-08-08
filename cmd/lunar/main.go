@@ -2,13 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
-	"math"
 	"os"
 	"path"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -174,12 +173,14 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 	for i, r := range rs {
 		// calc timedelta
 		var timedeltaStr string
-		timedelta := now.Sub(r.Date.Time()).Hours() / 24
-		if timedelta < 0 {
-			timedelta = math.Abs(timedelta)
-			timedeltaStr = strings.Join([]string{"还有 ", strconv.Itoa(int(timedelta)), " 天"}, "")
-		} else {
-			timedeltaStr = strings.Join([]string{"已过去 ", strconv.Itoa(int(timedelta)), " 天"}, "")
+		timedelta := int(now.Sub(r.Date.Time()).Hours() / 24)
+		switch {
+		case timedelta < 0:
+			timedeltaStr = fmt.Sprintf("还有 %d 天", -timedelta)
+		case timedelta == 0:
+			timedeltaStr = "今天"
+		case timedelta > 0:
+			timedeltaStr = fmt.Sprintf("已过去 %d 天", timedelta)
 		}
 
 		row := []string{
