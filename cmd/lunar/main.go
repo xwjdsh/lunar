@@ -168,7 +168,7 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 	})
 
 	data := make([][]string, len(rs))
-	now := time.Now()
+	now := currentDate(nil).Time()
 
 	for i, r := range rs {
 		// calc timedelta
@@ -232,7 +232,9 @@ func getLunarResult(d lunar.Date, reverse bool) (*lunar.Result, error) {
 
 func currentDate(c *cli.Context) lunar.Date {
 	d := lunar.DateByTime(time.Now().In(CST))
-	d.Year = c.Int("year")
+	if c != nil {
+		d.Year = c.Int("year")
+	}
 
 	return d
 }
