@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"log"
+	"math"
 	"os"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -167,11 +169,24 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 	})
 
 	data := make([][]string, len(rs))
+	now := time.Now()
+
 	for i, r := range rs {
+		// calc timedelta
+		var timedeltaStr string
+		timedelta := now.Sub(r.Date.Time()).Hours() / 24
+		if timedelta < 0 {
+			timedelta = math.Abs(timedelta)
+			timedeltaStr = strings.Join([]string{"还有 ", strconv.Itoa(int(timedelta)), " 天"}, "")
+		} else {
+			timedeltaStr = strings.Join([]string{"已过去 ", strconv.Itoa(int(timedelta)), " 天"}, "")
+		}
+
 		row := []string{
 			r.Date.Time().Format(dateFormat),
 			r.LunarDate.Time().Format(dateFormat),
 			r.WeekdayRaw,
+			timedeltaStr,
 			r.SolarTerm,
 		}
 
@@ -193,7 +208,7 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	header := []string{"公历", "农历", "星期", "节气", "别名", "标签"}
+	header := []string{"公历", "农历", "星期", "距今", "节气", "别名", "标签"}
 	table.SetHeader(header)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.AppendBulk(data)
