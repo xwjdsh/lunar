@@ -4,12 +4,13 @@ import (
 	"testing"
 )
 
-var m = map[Date]Date{
-	{2021, 7, 20}:  {2021, 6, 11},
-	{1995, 1, 1}:   {1994, 12, 1},
-	{2022, 2, 1}:   {2022, 1, 1},
-	{2088, 9, 19}:  {2088, 8, 5},
-	{2088, 12, 19}: {2088, 11, 7},
+var m = map[Date]LunarDate{
+	NewDate(2021, 7, 20):  NewLunarDate(NewDate(2021, 6, 11), false),
+	NewDate(1995, 1, 1):   NewLunarDate(NewDate(1994, 12, 1), false),
+	NewDate(2020, 5, 12):  NewLunarDate(NewDate(2020, 4, 20), false),
+	NewDate(2020, 6, 11):  NewLunarDate(NewDate(2020, 4, 20), true),
+	NewDate(2088, 9, 19):  NewLunarDate(NewDate(2088, 8, 5), false),
+	NewDate(2088, 12, 19): NewLunarDate(NewDate(2088, 11, 7), false),
 }
 
 func TestDateToLunarDate(t *testing.T) {

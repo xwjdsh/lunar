@@ -51,6 +51,10 @@ type LunarDate struct {
 	IsLeapMonth bool
 }
 
+func NewLunarDate(d Date, isLeapMonth bool) LunarDate {
+	return LunarDate{Date: d, IsLeapMonth: isLeapMonth}
+}
+
 func (d LunarDate) IsLunarDate() bool {
 	return true
 }
@@ -181,7 +185,7 @@ func (h *Handler) DateToLunarDate(d Date) (*Result, error) {
 		}
 		defer f.Close()
 
-		_, lr, err := h.find(f, d, d.Year-1, LunarDate{Date: NewDate(d.Year-2, 0, 0)}, false)
+		_, lr, err := h.find(f, d, d.Year-1, NewLunarDate(NewDate(d.Year-2, 0, 0), false), false)
 		if err != nil && err != ErrNotFound {
 			return nil, err
 		}
@@ -216,7 +220,7 @@ func (h *Handler) LunarDateToDate(d LunarDate) (*Result, error) {
 		}
 		defer f.Close()
 
-		r, lr, err := h.find(f, d, d.Year, LunarDate{Date: NewDate(d.Year-1, 0, 0)}, false)
+		r, lr, err := h.find(f, d, d.Year, NewLunarDate(NewDate(d.Year-1, 0, 0), false), false)
 		if err == nil {
 			return r, nil
 		}
@@ -349,7 +353,7 @@ func (h *Handler) parseLine(line string, fileYear int, lunarYear, lunarMonth int
 	weekday := []rune(fields[2])
 	r := &Result{
 		Date:       DateByTime(t),
-		LunarDate:  LunarDate{Date: NewDate(lunarYear, lunarMonth, lunarDay), IsLeapMonth: isLeapMonth},
+		LunarDate:  NewLunarDate(NewDate(lunarYear, lunarMonth, lunarDay), isLeapMonth),
 		WeekdayRaw: fields[2],
 		Weekday:    time.Weekday(lunarMap[weekday[len(weekday)-1]]),
 	}

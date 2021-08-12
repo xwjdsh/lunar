@@ -223,12 +223,12 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 func getLunarResult(d lunar.Date, reverse bool) ([]*lunar.Result, error) {
 	results := []*lunar.Result{}
 	if reverse {
-		r1, err := lunar.LunarDateToDate(lunar.LunarDate{Date: d})
+		r1, err := lunar.LunarDateToDate(lunar.NewLunarDate(d, false))
 		if err != nil {
 			return nil, err
 		}
 
-		r2, err := lunar.LunarDateToDate(lunar.LunarDate{Date: d, IsLeapMonth: true})
+		r2, err := lunar.LunarDateToDate(lunar.NewLunarDate(d, true))
 		if err != nil {
 			return nil, err
 		}
