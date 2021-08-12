@@ -138,7 +138,7 @@ func (h *Handler) getAliasResult(a *Alias, year int) (*Result, error) {
 
 	for _, y := range []int{year, year - 1} {
 		d.Year = y
-		r, err := h.LunarDateToDate(d)
+		r, err := h.LunarDateToDate(lunar.LunarDate{Date: d})
 		if err != nil {
 			return nil, err
 		}

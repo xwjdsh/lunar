@@ -138,11 +138,11 @@ func main() {
 				d.Month, d.Day = int(t.Month()), t.Day()
 			}
 
-			result, err := h.WrapResult(getLunarResult(d, c.Bool("reverse")))
+			results, err := h.WrapResults(getLunarResult(d, c.Bool("reverse")))
 			if err != nil {
 				return err
 			}
-			outputResults([]*alias.Result{result}, c)
+			outputResults(results, c)
 			return nil
 		},
 	}
@@ -183,9 +183,13 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 			timedeltaStr = fmt.Sprintf("已过去 %d 天", timedelta)
 		}
 
+		leapMonthStr := ""
+		if r.LunarDate.IsLeapMonth {
+			leapMonthStr = " (闰月)"
+		}
 		row := []string{
 			r.Date.Time().Format(dateFormat),
-			r.LunarDate.Time().Format(dateFormat),
+			r.LunarDate.Time().Format(dateFormat) + leapMonthStr,
 			r.WeekdayRaw,
 			timedeltaStr,
 			r.SolarTerm,
@@ -216,18 +220,28 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 	table.Render()
 }
 
-func getLunarResult(d lunar.Date, reverse bool) (*lunar.Result, error) {
-	var (
-		result *lunar.Result
-		err    error
-	)
+func getLunarResult(d lunar.Date, reverse bool) ([]*lunar.Result, error) {
+	results := []*lunar.Result{}
 	if reverse {
-		result, err = lunar.LunarDateToDate(d)
+		r1, err := lunar.LunarDateToDate(lunar.LunarDate{Date: d})
+		if err != nil {
+			return nil, err
+		}
+
+		r2, err := lunar.LunarDateToDate(lunar.LunarDate{Date: d, IsLeapMonth: true})
+		if err != nil {
+			return nil, err
+		}
+		results = []*lunar.Result{r1, r2}
 	} else {
-		result, err = lunar.DateToLunarDate(d)
+		r, err := lunar.DateToLunarDate(d)
+		if err != nil {
+			return nil, err
+		}
+		results = []*lunar.Result{r}
 	}
 
-	return result, err
+	return results, nil
 }
 
 func currentDate(c *cli.Context) lunar.Date {
