@@ -15,10 +15,12 @@ cd ./files && curl -O https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T\[
 */
 
 var (
+	// ErrNotFound date not found error
 	ErrNotFound  = errors.New("lunar: date not found")
 	loadFileFunc func(string) (io.ReadCloser, error)
 )
 
+// Result calendar query result
 type Result struct {
 	Date       Date
 	LunarDate  LunarDate
@@ -27,6 +29,7 @@ type Result struct {
 	SolarTerm  string
 }
 
+// DateType abstract date type, Date or LunarDate
 type DateType interface {
 	IsLunarDate() bool
 }
@@ -36,33 +39,40 @@ var (
 	_ DateType = LunarDate{}
 )
 
+// Date date
 type Date struct {
 	Year  int `json:"year"`
 	Month int `json:"month"`
 	Day   int `json:"day"`
 }
 
+// IsLunarDate implement DateType interface
 func (d Date) IsLunarDate() bool {
 	return false
 }
 
+// LunarDate lunar date
 type LunarDate struct {
 	Date
 	IsLeapMonth bool
 }
 
+// NewLunarDate returns a new LunarDate
 func NewLunarDate(d Date, isLeapMonth bool) LunarDate {
 	return LunarDate{Date: d, IsLeapMonth: isLeapMonth}
 }
 
+// IsLunarDate implement DateType api
 func (d LunarDate) IsLunarDate() bool {
 	return true
 }
 
+// NewDate returns a new Date
 func NewDate(y, m, d int) Date {
 	return Date{Year: y, Month: m, Day: d}
 }
 
+// DateByTime returns a Date by time
 func DateByTime(t time.Time) Date {
 	year, month, day := t.Date()
 	return Date{
@@ -72,16 +82,13 @@ func DateByTime(t time.Time) Date {
 	}
 }
 
+// Time date to time
 func (d Date) Time() time.Time {
 	return time.Date(d.Year, time.Month(d.Month), d.Day, 0, 0, 0, 0, time.UTC)
 }
 
 func (d Date) String() string {
 	return d.Time().Format("20060102")
-}
-
-func (d Date) Valid() bool {
-	return d.Year != 0 && d.Month != 0 && d.Day != 0
 }
 
 func fileDateFormat(year int) string {
@@ -118,20 +125,24 @@ type fileCache struct {
 	lunarDateCache map[LunarDate]*Result
 }
 
+// Handler handle date query logic
 type Handler struct {
 	cacheMap map[int]*fileCache
 }
 
+// New returns a new Handler
 func New() *Handler {
 	return &Handler{
 		cacheMap: map[int]*fileCache{},
 	}
 }
 
+// GetSolarTerms query date by solar terms
 func GetSolarTerms(year int, names ...string) ([]*Result, error) {
 	return defaultHandler.GetSolarTerms(year, names...)
 }
 
+// GetSolarTerms query date by solar terms
 func (h *Handler) GetSolarTerms(year int, names ...string) ([]*Result, error) {
 	if len(names) == 0 {
 		return h.getSolarTerms(year, nil)
@@ -166,10 +177,12 @@ func (h *Handler) getSolarTerms(year int, filterFunc func(*Result) bool) ([]*Res
 	return results, nil
 }
 
+// Calendar query date
 func Calendar(dt DateType) (*Result, error) {
 	return defaultHandler.Calendar(dt)
 }
 
+// Calendar query date
 func (h *Handler) Calendar(dt DateType) (*Result, error) {
 	var (
 		r   *Result

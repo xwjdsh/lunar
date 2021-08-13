@@ -18,8 +18,9 @@ import (
 	"github.com/xwjdsh/lunar/alias"
 )
 
-var CST = time.FixedZone("CST", 3600*8)
+var _CST = time.FixedZone("CST", 3600*8)
 
+// Config custom config
 type Config struct {
 	Aliases []*alias.Config `json:"aliases"`
 }
@@ -45,7 +46,7 @@ func main() {
 			&cli.IntFlag{
 				Name:    "year",
 				Aliases: []string{"y"},
-				Value:   time.Now().In(CST).Year(),
+				Value:   time.Now().In(_CST).Year(),
 				Usage:   "Target year",
 			},
 			&cli.BoolFlag{
@@ -254,7 +255,7 @@ func getLunarResult(d lunar.Date, reverse bool) ([]*lunar.Result, error) {
 }
 
 func currentDate(c *cli.Context) lunar.Date {
-	d := lunar.DateByTime(time.Now().In(CST))
+	d := lunar.DateByTime(time.Now().In(_CST))
 	if c != nil {
 		d.Year = c.Int("year")
 	}

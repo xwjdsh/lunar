@@ -2,12 +2,14 @@ package alias
 
 import "github.com/xwjdsh/lunar"
 
+// Alias represents a date alias
 type Alias struct {
 	Name  string
 	Dates []lunar.DateType
 	Tags  []string
 }
 
+// Config custom config
 type Config struct {
 	Name           string             `json:"name"`
 	Disable        bool               `json:"disable"`
@@ -17,6 +19,7 @@ type Config struct {
 	Tags           []string           `json:"tags"`
 }
 
+// ToAlias returns a new Alias by Config
 func (c *Config) ToAlias() *Alias {
 	var dts []lunar.DateType
 	if c.IsLunarDate {
@@ -28,6 +31,7 @@ func (c *Config) ToAlias() *Alias {
 	return New(c.Name, dts, c.Tags...)
 }
 
+// New returns a new Alias
 func New(name string, ds []lunar.DateType, tags ...string) *Alias {
 	return &Alias{
 		Name:  name,
@@ -36,11 +40,15 @@ func New(name string, ds []lunar.DateType, tags ...string) *Alias {
 	}
 }
 
+// LeapMonthLimitType leap month limit type
 type LeapMonthLimitType int
 
 const (
+	// LeapMonthOnlyNot only not leap month
 	LeapMonthOnlyNot LeapMonthLimitType = iota
+	// LeapMonthOnly only leap month
 	LeapMonthOnly
+	// LeapMonthNoLimit no limit of leap month
 	LeapMonthNoLimit
 )
 
@@ -63,17 +71,20 @@ var commonAliases = []*Alias{
 	New("腊八", getLunarDates(lunar.NewDate(0, 12, 8), LeapMonthOnlyNot)),
 }
 
+// Result wraps lunar.Result with aliases
 type Result struct {
 	Aliases []Alias
 	*lunar.Result
 }
 
+// Handler alias handler
 type Handler struct {
 	*lunar.Handler
 	aliasMap       map[string]*Alias
 	dateToAliasMap map[lunar.DateType][]*Alias
 }
 
+// NewHandler returns a new Handler
 func NewHandler(h *lunar.Handler) *Handler {
 	handler := &Handler{
 		Handler:        h,
@@ -97,6 +108,7 @@ func (h *Handler) refreshDateMap() {
 	}
 }
 
+// GetAliasesByTag get alias results by tag
 func (h *Handler) GetAliasesByTag(year int, tag string) ([]*Result, error) {
 	return h.getAliases(year, func(a *Alias) bool {
 		for _, t := range a.Tags {
@@ -108,6 +120,7 @@ func (h *Handler) GetAliasesByTag(year int, tag string) ([]*Result, error) {
 	})
 }
 
+// GetAliases query aliases
 func (h *Handler) GetAliases(year int, names ...string) ([]*Result, error) {
 	if len(names) == 0 {
 		return h.getAliases(year, nil)
@@ -188,6 +201,7 @@ func (h *Handler) getAliasResult(a *Alias, year int) ([]*Result, error) {
 	return results, nil
 }
 
+// WrapResults wrap results with alias info
 func (h *Handler) WrapResults(rs []*lunar.Result, err error) ([]*Result, error) {
 	if err != nil {
 		return nil, err
@@ -201,6 +215,7 @@ func (h *Handler) WrapResults(rs []*lunar.Result, err error) ([]*Result, error) 
 	return nrs, nil
 }
 
+// WrapResult wrap result with alias info
 func (h *Handler) WrapResult(r *lunar.Result, err error) (*Result, error) {
 	if err != nil {
 		return nil, err
@@ -230,6 +245,7 @@ func (h *Handler) resultWithAliases(r *lunar.Result) *Result {
 	return nr
 }
 
+// LoadCustomAlias load custom alias config
 func (h *Handler) LoadCustomAlias(cs []*Config) error {
 	for _, c := range cs {
 		if c.Disable {
