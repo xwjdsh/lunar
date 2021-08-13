@@ -149,7 +149,7 @@ func (h *Handler) GetSolarTerms(year int, names ...string) ([]*Result, error) {
 func (h *Handler) getSolarTerms(year int, filterFunc func(*Result) bool) ([]*Result, error) {
 	var results []*Result
 	for _, y := range []int{year, year + 1} {
-		_, err := h.DateToLunarDate(NewDate(y, 1, 1))
+		_, err := h.dateToLunarDate(NewDate(y, 1, 1))
 		if err != nil {
 			return nil, err
 		}
@@ -166,11 +166,25 @@ func (h *Handler) getSolarTerms(year int, filterFunc func(*Result) bool) ([]*Res
 	return results, nil
 }
 
-func DateToLunarDate(d Date) (*Result, error) {
-	return defaultHandler.DateToLunarDate(d)
+func Calendar(dt DateType) (*Result, error) {
+	return defaultHandler.Calendar(dt)
 }
 
-func (h *Handler) DateToLunarDate(d Date) (*Result, error) {
+func (h *Handler) Calendar(dt DateType) (*Result, error) {
+	var (
+		r   *Result
+		err error
+	)
+	if dt.IsLunarDate() {
+		r, err = h.lunarDateToDate(dt.(LunarDate))
+	} else {
+		r, err = h.dateToLunarDate(dt.(Date))
+	}
+
+	return r, err
+}
+
+func (h *Handler) dateToLunarDate(d Date) (*Result, error) {
 	if loaded, r, _ := h.queryCache(d.Year, d); loaded && r != nil {
 		return r, nil
 	}
@@ -202,11 +216,7 @@ func (h *Handler) DateToLunarDate(d Date) (*Result, error) {
 	return r, err
 }
 
-func LunarDateToDate(d LunarDate) (*Result, error) {
-	return defaultHandler.LunarDateToDate(d)
-}
-
-func (h *Handler) LunarDateToDate(d LunarDate) (*Result, error) {
+func (h *Handler) lunarDateToDate(d LunarDate) (*Result, error) {
 	var lastResult *Result
 	if fileLoaded, r, lr := h.queryCache(d.Year, d); fileLoaded {
 		if r != nil {

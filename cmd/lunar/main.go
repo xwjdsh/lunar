@@ -223,22 +223,31 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 func getLunarResult(d lunar.Date, reverse bool) ([]*lunar.Result, error) {
 	results := []*lunar.Result{}
 	if reverse {
-		r1, err := lunar.LunarDateToDate(lunar.NewLunarDate(d, false))
-		if err != nil {
+		r1, err := lunar.Calendar(lunar.NewLunarDate(d, false))
+		if err == nil {
+			results = append(results, r1)
+		}
+
+		if err != nil && err != lunar.ErrNotFound {
 			return nil, err
 		}
 
-		r2, err := lunar.LunarDateToDate(lunar.NewLunarDate(d, true))
-		if err != nil {
+		r2, err := lunar.Calendar(lunar.NewLunarDate(d, true))
+		if err == nil {
+			results = append(results, r2)
+		}
+
+		if err != nil && err != lunar.ErrNotFound {
 			return nil, err
 		}
-		results = []*lunar.Result{r1, r2}
 	} else {
-		r, err := lunar.DateToLunarDate(d)
-		if err != nil {
+		r, err := lunar.Calendar(d)
+		if err == nil {
+			results = []*lunar.Result{r}
+		}
+		if err != nil && err != lunar.ErrNotFound {
 			return nil, err
 		}
-		results = []*lunar.Result{r}
 	}
 
 	return results, nil

@@ -158,7 +158,7 @@ func (h *Handler) getAliasResult(a *Alias, year int) ([]*Result, error) {
 		if !dt.IsLunarDate() {
 			d := dt.(lunar.Date)
 			d.Year = year
-			r, err := h.WrapResult(h.DateToLunarDate(d))
+			r, err := h.WrapResult(h.Calendar(d))
 			if err != nil {
 				if err == lunar.ErrNotFound {
 					continue
@@ -172,7 +172,7 @@ func (h *Handler) getAliasResult(a *Alias, year int) ([]*Result, error) {
 		d := dt.(lunar.LunarDate)
 		for _, y := range []int{year, year - 1} {
 			d.Year = y
-			r, err := h.LunarDateToDate(d)
+			r, err := h.Calendar(d)
 			if err != nil {
 				if err == lunar.ErrNotFound {
 					continue
