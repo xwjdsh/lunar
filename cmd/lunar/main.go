@@ -21,7 +21,7 @@ import (
 var CST = time.FixedZone("CST", 3600*8)
 
 type Config struct {
-	Aliases []*alias.Alias `json:"aliases"`
+	Aliases []*alias.Config `json:"aliases"`
 }
 
 func main() {

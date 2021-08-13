@@ -3,10 +3,29 @@ package alias
 import "github.com/xwjdsh/lunar"
 
 type Alias struct {
-	Name    string           `json:"name"`
-	Disable bool             `json:"disable"`
-	Dates   []lunar.DateType `json:"dates"`
-	Tags    []string         `json:"tags"`
+	Name  string
+	Dates []lunar.DateType
+	Tags  []string
+}
+
+type Config struct {
+	Name           string             `json:"name"`
+	Disable        bool               `json:"disable"`
+	Date           lunar.Date         `json:"date"`
+	IsLunarDate    bool               `json:"is_lunar_date"`
+	LeapMonthLimit LeapMonthLimitType `json:"leap_month_limit"`
+	Tags           []string           `json:"tags"`
+}
+
+func (c *Config) ToAlias() *Alias {
+	var dts []lunar.DateType
+	if c.IsLunarDate {
+		dts = getLunarDates(c.Date, c.LeapMonthLimit)
+	} else {
+		dts = getDates(c.Date)
+	}
+
+	return New(c.Name, dts, c.Tags...)
 }
 
 func New(name string, ds []lunar.DateType, tags ...string) *Alias {
@@ -20,9 +39,9 @@ func New(name string, ds []lunar.DateType, tags ...string) *Alias {
 type LeapMonthLimitType int
 
 const (
-	LeapMonthNoLimit LeapMonthLimitType = iota
+	LeapMonthOnlyNot LeapMonthLimitType = iota
 	LeapMonthOnly
-	LeapMonthOnlyNot
+	LeapMonthNoLimit
 )
 
 const holidayTag = "holiday"
@@ -150,11 +169,14 @@ func (h *Handler) getAliasResult(a *Alias, year int) ([]*Result, error) {
 			continue
 		}
 
+		d := dt.(lunar.LunarDate)
 		for _, y := range []int{year, year - 1} {
-			d := dt.(lunar.LunarDate)
 			d.Year = y
 			r, err := h.LunarDateToDate(d)
 			if err != nil {
+				if err == lunar.ErrNotFound {
+					continue
+				}
 				return nil, err
 			}
 			if r.Date.Year == year {
@@ -208,12 +230,12 @@ func (h *Handler) resultWithAliases(r *lunar.Result) *Result {
 	return nr
 }
 
-func (h *Handler) LoadCustomAlias(as []*Alias) error {
-	for _, a := range as {
-		if a.Disable {
-			delete(h.aliasMap, a.Name)
+func (h *Handler) LoadCustomAlias(cs []*Config) error {
+	for _, c := range cs {
+		if c.Disable {
+			delete(h.aliasMap, c.Name)
 		} else {
-			h.aliasMap[a.Name] = a
+			h.aliasMap[c.Name] = c.ToAlias()
 		}
 	}
 
