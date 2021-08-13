@@ -8,7 +8,7 @@ import (
 
 	"github.com/rakyll/statik/fs"
 
-	_ "github.com/xwjdsh/lunar/statik"
+	_ "github.com/xwjdsh/lunar/statik" // import statik
 )
 
 //go:generate go run github.com/rakyll/statik -src ./files -f -tags !go1.16
