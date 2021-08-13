@@ -3,44 +3,64 @@ package alias
 import "github.com/xwjdsh/lunar"
 
 type Alias struct {
-	Name        string     `json:"name"`
-	Disable     bool       `json:"disable"`
-	Date        lunar.Date `json:"date"`
-	IsLunarDate bool       `json:"is_lunar_date"`
-	Tags        []string   `json:"tags"`
+	Name  string
+	Dates []lunar.DateType
+	Tags  []string
 }
 
-func New(name string, d lunar.Date, isLunarDate bool, tags ...string) *Alias {
+type Config struct {
+	Name           string             `json:"name"`
+	Disable        bool               `json:"disable"`
+	Date           lunar.Date         `json:"date"`
+	IsLunarDate    bool               `json:"is_lunar_date"`
+	LeapMonthLimit LeapMonthLimitType `json:"leap_month_limit"`
+	Tags           []string           `json:"tags"`
+}
+
+func (c *Config) ToAlias() *Alias {
+	var dts []lunar.DateType
+	if c.IsLunarDate {
+		dts = getLunarDates(c.Date, c.LeapMonthLimit)
+	} else {
+		dts = getDates(c.Date)
+	}
+
+	return New(c.Name, dts, c.Tags...)
+}
+
+func New(name string, ds []lunar.DateType, tags ...string) *Alias {
 	return &Alias{
-		Name:        name,
-		Date:        d,
-		IsLunarDate: isLunarDate,
-		Tags:        tags,
+		Name:  name,
+		Dates: ds,
+		Tags:  tags,
 	}
 }
+
+type LeapMonthLimitType int
+
+const (
+	LeapMonthOnlyNot LeapMonthLimitType = iota
+	LeapMonthOnly
+	LeapMonthNoLimit
+)
 
 const holidayTag = "holiday"
 
 var holidayTags = []string{holidayTag}
 var commonAliases = []*Alias{
-	New("春节", lunar.NewDate(0, 1, 1), true, holidayTag),
-	New("元旦", lunar.NewDate(0, 1, 1), false, holidayTag),
-	New("元宵", lunar.NewDate(0, 1, 15), true),
-	New("清明", lunar.NewDate(0, 4, 4), false, holidayTag),
-	New("劳动", lunar.NewDate(0, 5, 1), false, holidayTag),
-	New("端午", lunar.NewDate(0, 5, 5), true, holidayTag),
-	New("七夕", lunar.NewDate(0, 7, 7), true),
-	New("中元", lunar.NewDate(0, 7, 15), true),
-	New("中秋", lunar.NewDate(0, 8, 15), true, holidayTag),
-	New("重阳", lunar.NewDate(0, 9, 9), true),
-	New("国庆", lunar.NewDate(0, 10, 1), false, holidayTag),
-	New("下元", lunar.NewDate(0, 10, 15), true),
-	New("腊八", lunar.NewDate(0, 12, 8), true),
-}
-
-type dateWithLunar struct {
-	isLunar bool
-	lunar.Date
+	New("春节", getLunarDates(lunar.NewDate(0, 1, 1), LeapMonthOnlyNot), holidayTag),
+	New("元旦", getDates(lunar.NewDate(0, 1, 1)), holidayTag),
+	New("元宵", getLunarDates(lunar.NewDate(0, 1, 15), LeapMonthOnlyNot)),
+	New("清明", getDates(lunar.NewDate(0, 4, 4)), holidayTag),
+	New("劳动", getDates(lunar.NewDate(0, 5, 1)), holidayTag),
+	New("端午", getLunarDates(lunar.NewDate(0, 5, 5), LeapMonthOnlyNot), holidayTag),
+	New("七夕", getLunarDates(lunar.NewDate(0, 7, 7), LeapMonthOnlyNot)),
+	New("中元", getLunarDates(lunar.NewDate(0, 7, 15), LeapMonthOnlyNot)),
+	New("中秋", getLunarDates(lunar.NewDate(0, 8, 15), LeapMonthOnlyNot), holidayTag),
+	New("重阳", getLunarDates(lunar.NewDate(0, 9, 9), LeapMonthOnlyNot)),
+	New("国庆", getDates(lunar.NewDate(0, 10, 1)), holidayTag),
+	New("下元", getLunarDates(lunar.NewDate(0, 10, 15), LeapMonthOnlyNot)),
+	New("腊八", getLunarDates(lunar.NewDate(0, 12, 8), LeapMonthOnlyNot)),
 }
 
 type Result struct {
@@ -51,14 +71,14 @@ type Result struct {
 type Handler struct {
 	*lunar.Handler
 	aliasMap       map[string]*Alias
-	dateToAliasMap map[dateWithLunar][]*Alias
+	dateToAliasMap map[lunar.DateType][]*Alias
 }
 
 func NewHandler(h *lunar.Handler) *Handler {
 	handler := &Handler{
 		Handler:        h,
 		aliasMap:       map[string]*Alias{},
-		dateToAliasMap: map[dateWithLunar][]*Alias{},
+		dateToAliasMap: map[lunar.DateType][]*Alias{},
 	}
 	for _, a := range commonAliases {
 		handler.aliasMap[a.Name] = a
@@ -69,10 +89,11 @@ func NewHandler(h *lunar.Handler) *Handler {
 }
 
 func (h *Handler) refreshDateMap() {
-	h.dateToAliasMap = map[dateWithLunar][]*Alias{}
+	h.dateToAliasMap = map[lunar.DateType][]*Alias{}
 	for _, a := range h.aliasMap {
-		dl := dateWithLunar{Date: a.Date, isLunar: a.IsLunarDate}
-		h.dateToAliasMap[dl] = append(h.dateToAliasMap[dl], a)
+		for _, dt := range a.Dates {
+			h.dateToAliasMap[dt] = append(h.dateToAliasMap[dt], a)
+		}
 	}
 }
 
@@ -104,8 +125,8 @@ func (h *Handler) GetAliases(year int, names ...string) ([]*Result, error) {
 
 func (h *Handler) getAliases(year int, filterFunc func(*Alias) bool) ([]*Result, error) {
 	var (
-		rs []*Result
-		dm = map[lunar.Date]bool{}
+		results []*Result
+		dm      = map[lunar.Date]bool{}
 	)
 
 	for _, a := range h.aliasMap {
@@ -113,41 +134,58 @@ func (h *Handler) getAliases(year int, filterFunc func(*Alias) bool) ([]*Result,
 			continue
 		}
 
-		r, err := h.getAliasResult(a, year)
+		rs, err := h.getAliasResult(a, year)
 		if err != nil {
 			return nil, err
 		}
-		if dm[r.Date] {
-			// eg. 2001-10-01, 既是国庆也是中秋
+		for _, r := range rs {
+			if dm[r.Date] {
+				// eg. 2001-10-01, 既是国庆也是中秋
+				continue
+			}
+
+			results = append(results, r)
+			dm[r.Date] = true
+		}
+	}
+
+	return results, nil
+}
+
+func (h *Handler) getAliasResult(a *Alias, year int) ([]*Result, error) {
+	results := []*Result{}
+	for _, dt := range a.Dates {
+		if !dt.IsLunarDate() {
+			d := dt.(lunar.Date)
+			d.Year = year
+			r, err := h.WrapResult(h.Calendar(d))
+			if err != nil {
+				if err == lunar.ErrNotFound {
+					continue
+				}
+				return nil, err
+			}
+			results = append(results, r)
 			continue
 		}
 
-		rs = append(rs, r)
-		dm[r.Date] = true
-	}
-
-	return rs, nil
-}
-
-func (h *Handler) getAliasResult(a *Alias, year int) (*Result, error) {
-	d := a.Date
-	if !a.IsLunarDate {
-		d.Year = year
-		return h.WrapResult(h.DateToLunarDate(d))
-	}
-
-	for _, y := range []int{year, year - 1} {
-		d.Year = y
-		r, err := h.LunarDateToDate(d)
-		if err != nil {
-			return nil, err
-		}
-		if r.Date.Year == year {
-			return h.resultWithAliases(r), nil
+		d := dt.(lunar.LunarDate)
+		for _, y := range []int{year, year - 1} {
+			d.Year = y
+			r, err := h.Calendar(d)
+			if err != nil {
+				if err == lunar.ErrNotFound {
+					continue
+				}
+				return nil, err
+			}
+			if r.Date.Year == year {
+				results = append(results, h.resultWithAliases(r))
+			}
 		}
 	}
 
-	return nil, lunar.ErrNotFound
+	return results, nil
 }
 
 func (h *Handler) WrapResults(rs []*lunar.Result, err error) ([]*Result, error) {
@@ -172,16 +210,18 @@ func (h *Handler) WrapResult(r *lunar.Result, err error) (*Result, error) {
 }
 
 func (h *Handler) resultWithAliases(r *lunar.Result) *Result {
-	d := lunar.NewDate(0, r.Date.Month, r.Date.Day)
+	d := r.Date
+	d.Year = 0
 	nr := &Result{Result: r}
-	if as, ok := h.dateToAliasMap[dateWithLunar{Date: d, isLunar: false}]; ok {
+	if as, ok := h.dateToAliasMap[d]; ok {
 		for _, a := range as {
 			nr.Aliases = append(nr.Aliases, *a)
 		}
 	}
 
-	d = lunar.NewDate(0, r.LunarDate.Month, r.LunarDate.Day)
-	if as, ok := h.dateToAliasMap[dateWithLunar{Date: d, isLunar: true}]; ok {
+	d1 := r.LunarDate
+	d1.Year = 0
+	if as, ok := h.dateToAliasMap[d1]; ok {
 		for _, a := range as {
 			nr.Aliases = append(nr.Aliases, *a)
 		}
@@ -190,15 +230,38 @@ func (h *Handler) resultWithAliases(r *lunar.Result) *Result {
 	return nr
 }
 
-func (h *Handler) LoadCustomAlias(as []*Alias) error {
-	for _, a := range as {
-		if a.Disable {
-			delete(h.aliasMap, a.Name)
+func (h *Handler) LoadCustomAlias(cs []*Config) error {
+	for _, c := range cs {
+		if c.Disable {
+			delete(h.aliasMap, c.Name)
 		} else {
-			h.aliasMap[a.Name] = a
+			h.aliasMap[c.Name] = c.ToAlias()
 		}
 	}
 
 	h.refreshDateMap()
 	return nil
+}
+
+func getLunarDates(d lunar.Date, leapMonthType LeapMonthLimitType) []lunar.DateType {
+	var results []lunar.DateType
+	switch leapMonthType {
+	case LeapMonthNoLimit:
+		results = []lunar.DateType{lunar.NewLunarDate(d, true), lunar.NewLunarDate(d, false)}
+	case LeapMonthOnly:
+		results = []lunar.DateType{lunar.NewLunarDate(d, true)}
+	case LeapMonthOnlyNot:
+		results = []lunar.DateType{lunar.NewLunarDate(d, false)}
+	}
+
+	return results
+}
+
+func getDates(ds ...lunar.Date) []lunar.DateType {
+	result := []lunar.DateType{}
+	for _, d := range ds {
+		result = append(result, d)
+	}
+
+	return result
 }
