@@ -1,6 +1,9 @@
 package alias
 
-import "github.com/xwjdsh/lunar"
+import (
+	"github.com/xwjdsh/lunar"
+	"github.com/xwjdsh/lunar/config"
+)
 
 // Alias represents a date alias
 type Alias struct {
@@ -9,23 +12,14 @@ type Alias struct {
 	Tags  []string
 }
 
-// Config custom config
-type Config struct {
-	Name           string             `json:"name"`
-	Disable        bool               `json:"disable"`
-	Date           lunar.Date         `json:"date"`
-	IsLunarDate    bool               `json:"is_lunar_date"`
-	LeapMonthLimit LeapMonthLimitType `json:"leap_month_limit"`
-	Tags           []string           `json:"tags"`
-}
-
-// ToAlias returns a new Alias by Config
-func (c *Config) ToAlias() *Alias {
+// ConvertAlias convert config.Alias to Alias
+func ConvertAlias(c *config.Alias) *Alias {
 	var dts []lunar.DateType
+	date := lunar.Date(c.Date)
 	if c.IsLunarDate {
-		dts = getLunarDates(c.Date, c.LeapMonthLimit)
+		dts = getLunarDates(date, c.LeapMonthLimit)
 	} else {
-		dts = getDates(c.Date)
+		dts = getDates(date)
 	}
 
 	return New(c.Name, dts, c.Tags...)
@@ -38,37 +32,6 @@ func New(name string, ds []lunar.DateType, tags ...string) *Alias {
 		Dates: ds,
 		Tags:  tags,
 	}
-}
-
-// LeapMonthLimitType leap month limit type
-type LeapMonthLimitType int
-
-const (
-	// LeapMonthOnlyNot only not leap month
-	LeapMonthOnlyNot LeapMonthLimitType = iota
-	// LeapMonthOnly only leap month
-	LeapMonthOnly
-	// LeapMonthNoLimit no limit of leap month
-	LeapMonthNoLimit
-)
-
-const holidayTag = "holiday"
-
-var holidayTags = []string{holidayTag}
-var commonAliases = []*Alias{
-	New("春节", getLunarDates(lunar.NewDate(0, 1, 1), LeapMonthOnlyNot), holidayTag),
-	New("元旦", getDates(lunar.NewDate(0, 1, 1)), holidayTag),
-	New("元宵", getLunarDates(lunar.NewDate(0, 1, 15), LeapMonthOnlyNot)),
-	New("清明", getDates(lunar.NewDate(0, 4, 4)), holidayTag),
-	New("劳动", getDates(lunar.NewDate(0, 5, 1)), holidayTag),
-	New("端午", getLunarDates(lunar.NewDate(0, 5, 5), LeapMonthOnlyNot), holidayTag),
-	New("七夕", getLunarDates(lunar.NewDate(0, 7, 7), LeapMonthOnlyNot)),
-	New("中元", getLunarDates(lunar.NewDate(0, 7, 15), LeapMonthOnlyNot)),
-	New("中秋", getLunarDates(lunar.NewDate(0, 8, 15), LeapMonthOnlyNot), holidayTag),
-	New("重阳", getLunarDates(lunar.NewDate(0, 9, 9), LeapMonthOnlyNot)),
-	New("国庆", getDates(lunar.NewDate(0, 10, 1)), holidayTag),
-	New("下元", getLunarDates(lunar.NewDate(0, 10, 15), LeapMonthOnlyNot)),
-	New("腊八", getLunarDates(lunar.NewDate(0, 12, 8), LeapMonthOnlyNot)),
 }
 
 // Result wraps lunar.Result with aliases
@@ -86,25 +49,10 @@ type Handler struct {
 
 // NewHandler returns a new Handler
 func NewHandler(h *lunar.Handler) *Handler {
-	handler := &Handler{
+	return &Handler{
 		Handler:        h,
 		aliasMap:       map[string]*Alias{},
 		dateToAliasMap: map[lunar.DateType][]*Alias{},
-	}
-	for _, a := range commonAliases {
-		handler.aliasMap[a.Name] = a
-	}
-
-	handler.refreshDateMap()
-	return handler
-}
-
-func (h *Handler) refreshDateMap() {
-	h.dateToAliasMap = map[lunar.DateType][]*Alias{}
-	for _, a := range h.aliasMap {
-		for _, dt := range a.Dates {
-			h.dateToAliasMap[dt] = append(h.dateToAliasMap[dt], a)
-		}
 	}
 }
 
@@ -245,28 +193,31 @@ func (h *Handler) resultWithAliases(r *lunar.Result) *Result {
 	return nr
 }
 
-// LoadCustomAlias load custom alias config
-func (h *Handler) LoadCustomAlias(cs []*Config) error {
+// LoadAlias load alias config
+func (h *Handler) LoadAlias(cs []*config.Alias) {
+	h.aliasMap = map[string]*Alias{}
 	for _, c := range cs {
-		if c.Disable {
-			delete(h.aliasMap, c.Name)
-		} else {
-			h.aliasMap[c.Name] = c.ToAlias()
+		if !c.Disable {
+			h.aliasMap[c.Name] = ConvertAlias(c)
 		}
 	}
 
-	h.refreshDateMap()
-	return nil
+	h.dateToAliasMap = map[lunar.DateType][]*Alias{}
+	for _, a := range h.aliasMap {
+		for _, dt := range a.Dates {
+			h.dateToAliasMap[dt] = append(h.dateToAliasMap[dt], a)
+		}
+	}
 }
 
-func getLunarDates(d lunar.Date, leapMonthType LeapMonthLimitType) []lunar.DateType {
+func getLunarDates(d lunar.Date, leapMonthType config.LeapMonthLimitType) []lunar.DateType {
 	var results []lunar.DateType
 	switch leapMonthType {
-	case LeapMonthNoLimit:
+	case config.LeapMonthNoLimit:
 		results = []lunar.DateType{lunar.NewLunarDate(d, true), lunar.NewLunarDate(d, false)}
-	case LeapMonthOnly:
+	case config.LeapMonthOnly:
 		results = []lunar.DateType{lunar.NewLunarDate(d, true)}
-	case LeapMonthOnlyNot:
+	case config.LeapMonthOnlyNot:
 		results = []lunar.DateType{lunar.NewLunarDate(d, false)}
 	}
 

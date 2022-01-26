@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -16,17 +14,22 @@ import (
 
 	"github.com/xwjdsh/lunar"
 	"github.com/xwjdsh/lunar/alias"
+	"github.com/xwjdsh/lunar/config"
 )
 
 var _CST = time.FixedZone("CST", 3600*8)
 
-// Config custom config
-type Config struct {
-	Aliases []*alias.Config `json:"aliases"`
-}
-
 func main() {
 	h := alias.NewHandler(lunar.New())
+	beforeFunc := func(c *cli.Context) error {
+		fp := c.String("config")
+		conf, err := config.Init(fp, false)
+		if err != nil {
+			return err
+		}
+		h.LoadAlias(conf.Aliases)
+		return nil
+	}
 	app := &cli.App{
 		Name:  "lunar",
 		Usage: "lunar is a command line tool for conversion between Gregorian calendar and lunar calendar.(1901~2100)",
@@ -40,7 +43,7 @@ func main() {
 			&cli.StringFlag{
 				Name:    "config",
 				Aliases: []string{"c"},
-				Value:   path.Join(mustUserHomeDir(), ".config/lunar/lunar.json"),
+				Value:   path.Join(mustUserHomeDir(), ".config/lunar/lunar.yml"),
 				Usage:   "Custom config path",
 			},
 			&cli.IntFlag{
@@ -55,21 +58,6 @@ func main() {
 				Usage:   "Reverse mode, query date by lunar date",
 			},
 		},
-		Before: func(c *cli.Context) error {
-			fp := c.String("config")
-			data, err := ioutil.ReadFile(fp)
-			if err != nil {
-				if os.IsNotExist(err) {
-					return nil
-				}
-				return err
-			}
-			conf := &Config{}
-			if err := json.Unmarshal(data, conf); err != nil {
-				return err
-			}
-			return h.LoadCustomAlias(conf.Aliases)
-		},
 		Commands: []*cli.Command{
 			{
 				Name:    "alias",
@@ -81,7 +69,8 @@ func main() {
 						Usage:   "query by tag",
 					},
 				},
-				Usage: "Show alias date info",
+				Usage:  "Show alias date info",
+				Before: beforeFunc,
 				Action: func(c *cli.Context) error {
 					d := currentDate(c)
 					var (
@@ -109,6 +98,7 @@ func main() {
 				Name:    "solar-term",
 				Aliases: []string{"st"},
 				Usage:   "Get solar term info",
+				Before:  beforeFunc,
 				Action: func(c *cli.Context) error {
 					d := currentDate(c)
 					var (
@@ -128,8 +118,35 @@ func main() {
 					return nil
 				},
 			},
+			{
+				Name:    "config",
+				Aliases: []string{"c"},
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "default",
+						Aliases: []string{"d"},
+						Usage:   "Show default config",
+					},
+				},
+				Usage: "Display config",
+				Action: func(c *cli.Context) error {
+					conf, err := config.Init(c.String("config"), c.Bool("default"))
+					if err != nil {
+						return err
+					}
+					data, err := conf.Marshal()
+					if err != nil {
+						return err
+					}
+					fmt.Println(string(data))
+					return nil
+				},
+			},
 		},
 		Action: func(c *cli.Context) error {
+			if err := beforeFunc(c); err != nil {
+				return err
+			}
 			d := currentDate(c)
 			if s := c.Args().First(); s != "" {
 				t, err := time.Parse("0102", s)

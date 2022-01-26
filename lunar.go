@@ -8,6 +8,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/xwjdsh/lunar/config"
 )
 
 /*
@@ -46,11 +48,7 @@ var (
 )
 
 // Date date
-type Date struct {
-	Year  int `json:"year"`
-	Month int `json:"month"`
-	Day   int `json:"day"`
-}
+type Date config.Date
 
 // IsLunarDate implement DateType interface
 func (d Date) IsLunarDate() bool {
