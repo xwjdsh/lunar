@@ -32,12 +32,13 @@ USAGE:
 COMMANDS:
    alias, a        Show alias date info
    solar-term, st  Get solar term info
+   config, c       Display config
    help, h         Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
    --format value, -f value  Output date format (default: "2006-01-02")
-   --config value, -c value  Custom config path (default: "$HOME/.config/lunar/lunar.json")
-   --year value, -y value    Target year (default: current year)
+   --config value, -c value  Custom config path (default: "$HOME/.config/lunar/lunar.yml")
+   --year value, -y value    Target year (default: $THIS_YEAR)
    --reverse, -r             Reverse mode, query date by lunar date (default: false)
    --help, -h                show help (default: false)
 ```
@@ -62,6 +63,31 @@ GLOBAL OPTIONS:
 |    阳历    |    阴历    |  星期  |    距今    | 节气 | 别名 | 标签 |
 |  ----  | ----  |  ----  | ----  |  ----  | ----  |  ----  |
 | 2022-02-26 | 2022-01-26 | 星期六 | 还有 31 天 |      |      |      |
+
+### 自定义配置别名
+```
+> # lunar config -d                            # 显示默认配置，默认加入了一些常见节日的别名
+> lunar config -d > ~/.config/lunar/lunar.yml  # 导出默认配置，自定义修改
+> # lunar config                               # 显示当前配置
+```
+例如修改为如下，
+```yml
+aliases:
+    - name: xx的生日
+      disable: false
+      date:
+        year: 0
+        month: 5
+        day: 7
+      is_lunar_date: true
+      leap_month_limit: 0
+      tags:
+        - birthday
+```
+|    阳历    |    阴历    |  星期  |    距今     | 节气 |   别名   |   标签   |
+|  ----  | ----  |  ----  | ----  |  ----  | ----  |  ----  |
+| 2022-06-05 | 2022-05-07 | 星期日 | 还有 130 天 |      | xx的生日 | birthday |
+
 
 ### 查询别名
 ```
