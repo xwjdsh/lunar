@@ -21,6 +21,15 @@ else
 ```
 go install github.com/xwjdsh/lunar/cmd/lunar
 ```
+
+### Docker
+```
+alias lunar='docker run -it --rm wendellsun/lunar'
+
+# 挂载自定义配置
+alias lunar='docker run -it -v $PATH_TO_YOUR_CONFIG:/root/.config/lunar/lunar.yml --rm wendellsun/lunar'
+```
+
 ### Manual
 从 [releases](https://github.com/xwjdsh/lunar/releases) 下载对应的可执行文件并将其放到 PATH 环境变量对应的路径中。
 
