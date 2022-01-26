@@ -214,7 +214,7 @@ func outputResults(rs []*alias.Result, c *cli.Context) {
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	header := []string{"公历", "农历", "星期", "距今", "节气", "别名", "标签"}
+	header := []string{"阳历", "阴历", "星期", "距今", "节气", "别名", "标签"}
 	table.SetHeader(header)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.AppendBulk(data)
