@@ -11,7 +11,9 @@ brew tap xwjdsh/tap
 brew install xwjdsh/tap/lunar
 ```
 ### Go
-if go_version <= 1.16
+> 仅支持 `go1.16` 及以上版本
+
+if go_version == 1.16.x
 ```
 go get -u github.com/xwjdsh/lunar/cmd/lunar
 ```
