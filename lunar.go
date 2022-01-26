@@ -2,6 +2,7 @@ package lunar
 
 import (
 	"bufio"
+	"embed"
 	"errors"
 	"fmt"
 	"io"
@@ -14,10 +15,15 @@ cd ./files && curl -O https://www.hko.gov.hk/tc/gts/time/calendar/text/files/T\[
 	find . -type f -exec sh -c 'iconv -f big5 -t utf-8 -c {} > {}.utf8' \; -exec mv "{}".utf8 "{}" \; && cd ..
 */
 
+//go:embed files
+var files embed.FS
+
 var (
 	// ErrNotFound date not found error
 	ErrNotFound  = errors.New("lunar: date not found")
-	loadFileFunc func(string) (io.ReadCloser, error)
+	loadFileFunc = func(name string) (io.ReadCloser, error) {
+		return files.Open("files/" + name)
+	}
 )
 
 // Result calendar query result
