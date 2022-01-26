@@ -2,6 +2,8 @@
 
 `lunar` 是一个命令行下的阴历阳历查询转换工具。
 
+![](https://raw.githubusercontent.com/xwjdsh/lunar/main/screenshot.png)
+
 ## 安装
 ### Homebrew
 ```
